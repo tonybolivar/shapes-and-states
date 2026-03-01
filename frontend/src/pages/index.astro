@@ -1,0 +1,664 @@
+---
+---
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SHAPES & STATES</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Barlow+Condensed:ital,wght@0,300;0,400;0,500;0,600;1,400&display=swap" rel="stylesheet" />
+
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --red:         #C41E3A;
+      --red-dark:    #8B1428;
+      --red-dim:     rgba(196,30,58,0.12);
+      --gold:        #D4920A;
+      --gold-dim:    rgba(212,146,10,0.18);
+      --bg:          #0D0D10;
+      --surface:     #141418;
+      --panel:       #18181D;
+      --panel-alt:   #1E1E24;
+      --white:       #EDE8DC;
+      --muted:       #7A7670;
+      --dim:         #32302C;
+      --header-h:    56px;
+    }
+
+    html, body {
+      height: 100%;
+      overflow: hidden;
+      background: var(--bg);
+      color: var(--white);
+      font-family: 'Barlow Condensed', sans-serif;
+    }
+
+    /* ── Grain overlay ─────────────────────────────── */
+    body::after {
+      content: '';
+      position: fixed;
+      inset: 0;
+      z-index: 9999;
+      pointer-events: none;
+      opacity: 0.028;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+      background-size: 200px 200px;
+    }
+
+    /* ── HEADER ────────────────────────────────────── */
+    .site-header {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      height: var(--header-h);
+      z-index: 100;
+      background: var(--bg);
+      border-bottom: 3px solid var(--red);
+      display: flex;
+      align-items: stretch;
+    }
+
+    .header-inner {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 0 0 0;
+    }
+
+    /* Left title block — slight diagonal cut on right edge */
+    .title-block {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 0 28px 0 20px;
+      background: var(--surface);
+      height: 100%;
+      clip-path: polygon(0 0, calc(100% - 16px) 0, 100% 100%, 0 100%);
+      border-right: none;
+    }
+
+    .header-star {
+      font-size: 1.5rem;
+      color: var(--red);
+      line-height: 1;
+      animation: star-pulse 4s ease-in-out infinite;
+      flex-shrink: 0;
+    }
+
+    @keyframes star-pulse {
+      0%, 100% { opacity: 1; }
+      50%       { opacity: 0.6; }
+    }
+
+    .title-text { display: flex; flex-direction: column; gap: 3px; }
+
+    .site-title {
+      font-family: 'Oswald', sans-serif;
+      font-size: 1.25rem;
+      font-weight: 700;
+      letter-spacing: 0.14em;
+      color: var(--white);
+      line-height: 1;
+      text-transform: uppercase;
+    }
+
+    .title-sub {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .title-rule {
+      width: 20px;
+      height: 2px;
+      background: var(--red);
+      flex-shrink: 0;
+    }
+
+    .site-subtitle {
+      font-family: 'Barlow Condensed', sans-serif;
+      font-size: 0.6rem;
+      font-weight: 500;
+      letter-spacing: 0.3em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    /* Right side */
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding-right: 20px;
+    }
+
+    .player-count {
+      font-family: 'Oswald', sans-serif;
+      font-size: 0.75rem;
+      font-weight: 600;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    .player-count span {
+      color: var(--red);
+      font-size: 0.9rem;
+    }
+
+    .discord-pill {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      padding: 5px 14px;
+      border: 2px solid var(--dim);
+      background: var(--surface);
+      font-family: 'Barlow Condensed', sans-serif;
+      font-size: 0.62rem;
+      font-weight: 600;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      color: var(--muted);
+      clip-path: polygon(8px 0%, 100% 0%, calc(100% - 8px) 100%, 0% 100%);
+    }
+
+    .pill-star {
+      color: var(--red);
+      font-size: 0.7rem;
+      flex-shrink: 0;
+    }
+
+    /* ── MAP ──────────────────────────────────────── */
+    .map-wrapper {
+      position: fixed;
+      top: var(--header-h);
+      left: 0; right: 0; bottom: 0;
+      overflow: hidden;
+    }
+
+    .map-container {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #080809;
+      cursor: crosshair;
+    }
+
+    .base-map {
+      display: block;
+      max-width: 100%;
+      max-height: 100%;
+      object-fit: contain;
+      user-select: none;
+      -webkit-user-drag: none;
+      position: relative;
+      z-index: 1;
+    }
+
+    .borders-layer {
+      position: absolute;
+      z-index: 2;
+      pointer-events: none;
+    }
+
+    .borders-layer svg {
+      width: 100%;
+      height: 100%;
+      pointer-events: all;
+    }
+
+    .borders-layer path {
+      stroke: rgba(237,232,220,0.4);
+      stroke-width: 1.5;
+      cursor: pointer;
+      transition: filter 0.1s, opacity 0.1s;
+      opacity: 0.82;
+    }
+
+    .borders-layer path:hover {
+      filter: brightness(1.6) saturate(1.2);
+      opacity: 1;
+    }
+
+    .borders-layer path.selected {
+      filter: brightness(1.9) saturate(1.3);
+      opacity: 1;
+      stroke: var(--white);
+      stroke-width: 2.5;
+    }
+
+    /* Hard vignette — corners only */
+    .map-vignette {
+      position: absolute;
+      inset: 0;
+      z-index: 3;
+      pointer-events: none;
+      background:
+        radial-gradient(ellipse 90% 88% at 50% 50%,
+          transparent 52%,
+          rgba(13,13,16,0.6) 80%,
+          rgba(13,13,16,0.92) 100%);
+    }
+
+    /* ── EMPTY STATE ────────────────────────────── */
+    .empty-state {
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 10;
+      text-align: center;
+      pointer-events: none;
+      display: none;
+    }
+
+    .empty-state.visible { display: block; }
+
+    .empty-inner {
+      position: relative;
+      padding: 40px 52px;
+      background: var(--panel);
+      border-top: 3px solid var(--red);
+      border-bottom: 3px solid var(--red);
+    }
+
+    /* Diagonal stripe accents — left/right edges */
+    .empty-inner::before,
+    .empty-inner::after {
+      content: '';
+      position: absolute;
+      top: 0; bottom: 0;
+      width: 6px;
+      background-image: repeating-linear-gradient(
+        -45deg,
+        var(--red) 0px,
+        var(--red) 3px,
+        transparent 3px,
+        transparent 9px
+      );
+      opacity: 0.6;
+    }
+    .empty-inner::before { left: 0; }
+    .empty-inner::after  { right: 0; }
+
+    .empty-star {
+      font-size: 2.2rem;
+      color: var(--red);
+      line-height: 1;
+      margin-bottom: 14px;
+      animation: star-pulse 2.5s ease-in-out infinite;
+    }
+
+    .empty-title {
+      font-family: 'Oswald', sans-serif;
+      font-weight: 700;
+      font-size: clamp(1.6rem, 4vw, 3rem);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--white);
+      line-height: 1.05;
+      margin-bottom: 16px;
+    }
+
+    .empty-sub {
+      font-family: 'Barlow Condensed', sans-serif;
+      font-size: 0.75rem;
+      font-weight: 500;
+      letter-spacing: 0.32em;
+      text-transform: uppercase;
+      color: var(--red);
+    }
+
+    /* ── COORD READOUT ──────────────────────────── */
+    .coord-readout {
+      position: fixed;
+      bottom: 20px;
+      left: 20px;
+      z-index: 20;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: var(--panel);
+      border-left: 3px solid var(--red);
+      padding: 6px 14px 6px 12px;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.15s;
+    }
+
+    .coord-readout.visible { opacity: 1; }
+
+    .coord-label {
+      font-family: 'Oswald', sans-serif;
+      font-size: 0.6rem;
+      font-weight: 600;
+      letter-spacing: 0.2em;
+      color: var(--red);
+    }
+
+    .coord-val {
+      font-family: 'Barlow Condensed', sans-serif;
+      font-size: 0.8rem;
+      font-weight: 500;
+      letter-spacing: 0.1em;
+      color: var(--white);
+      min-width: 40px;
+    }
+
+    .coord-sep {
+      color: var(--dim);
+      font-size: 1rem;
+    }
+
+    /* ── INFO PANEL ─────────────────────────────── */
+    .info-panel {
+      position: fixed;
+      top: var(--header-h);
+      right: 0; bottom: 0;
+      width: 280px;
+      z-index: 50;
+      background: var(--panel);
+      border-left: 4px solid var(--red);
+      transform: translateX(100%);
+      transition: transform 0.25s cubic-bezier(0.4,0,0.2,1);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .info-panel.open { transform: translateX(0); }
+
+    /* Top stripe accent bar */
+    .panel-stripe {
+      height: 4px;
+      flex-shrink: 0;
+      background-image: repeating-linear-gradient(
+        90deg,
+        var(--red) 0px,
+        var(--red) 8px,
+        var(--bg) 8px,
+        var(--bg) 14px
+      );
+    }
+
+    .panel-content {
+      padding: 18px 20px;
+      flex: 1;
+      overflow-y: auto;
+      scrollbar-width: thin;
+      scrollbar-color: var(--red-dark) transparent;
+    }
+
+    .panel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+    }
+
+    .panel-kicker {
+      font-family: 'Barlow Condensed', sans-serif;
+      font-size: 0.58rem;
+      font-weight: 600;
+      letter-spacing: 0.32em;
+      text-transform: uppercase;
+      color: var(--red);
+    }
+
+    .panel-close {
+      background: none;
+      border: 2px solid var(--dim);
+      color: var(--muted);
+      width: 22px; height: 22px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-size: 11px;
+      font-family: 'Barlow Condensed', sans-serif;
+      transition: border-color 0.15s, color 0.15s;
+      flex-shrink: 0;
+    }
+
+    .panel-close:hover {
+      border-color: var(--red);
+      color: var(--red);
+    }
+
+    .panel-city-name {
+      font-family: 'Oswald', sans-serif;
+      font-size: 1.6rem;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--white);
+      line-height: 1.1;
+      margin-bottom: 18px;
+      word-break: break-word;
+    }
+
+    .panel-divider {
+      height: 2px;
+      background: var(--surface);
+      border-top: 1px solid var(--dim);
+      margin-bottom: 18px;
+    }
+
+    .data-row {
+      margin-bottom: 16px;
+    }
+
+    .data-label {
+      display: block;
+      font-family: 'Barlow Condensed', sans-serif;
+      font-size: 0.55rem;
+      font-weight: 600;
+      letter-spacing: 0.32em;
+      text-transform: uppercase;
+      color: var(--red);
+      margin-bottom: 5px;
+    }
+
+    .data-value {
+      font-family: 'Oswald', sans-serif;
+      font-size: 0.88rem;
+      font-weight: 400;
+      letter-spacing: 0.08em;
+      color: var(--white);
+    }
+
+    .commander-info {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .panel-avatar {
+      width: 34px; height: 34px;
+      border-radius: 0;
+      border: 2px solid var(--red-dark);
+      object-fit: cover;
+      flex-shrink: 0;
+    }
+
+    .panel-avatar-placeholder {
+      width: 34px; height: 34px;
+      border: 2px solid var(--dim);
+      background: var(--panel-alt);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--red);
+      font-size: 14px;
+      flex-shrink: 0;
+    }
+
+    /* Discord deploy hint */
+    .discord-hint {
+      margin-top: 4px;
+      padding: 12px;
+      background: var(--panel-alt);
+      border-left: 3px solid var(--gold);
+    }
+
+    .discord-hint .data-label {
+      color: var(--gold);
+      margin-bottom: 7px;
+    }
+
+    .discord-hint code {
+      display: block;
+      font-family: 'Barlow Condensed', sans-serif;
+      font-style: normal;
+      font-size: 0.72rem;
+      font-weight: 500;
+      letter-spacing: 0.04em;
+      color: var(--white);
+      word-break: break-all;
+      line-height: 1.5;
+    }
+
+    /* ── SCROLLBAR ──────────────────────────────── */
+    ::-webkit-scrollbar { width: 3px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--red-dark); }
+  </style>
+</head>
+<body>
+
+<!-- ── HEADER ──────────────────────────────────── -->
+<header class="site-header">
+  <div class="header-inner">
+    <div class="title-block">
+      <span class="header-star" aria-hidden="true">★</span>
+      <div class="title-text">
+        <h1 class="site-title">Shapes &amp; States</h1>
+        <div class="title-sub">
+          <span class="title-rule"></span>
+          <span class="site-subtitle">Territorial Claims</span>
+        </div>
+      </div>
+    </div>
+    <div class="header-right">
+      <div class="player-count" id="player-count"></div>
+      <div class="discord-pill">
+        <span class="pill-star" aria-hidden="true">★</span>
+        Use /place-city in Discord
+      </div>
+    </div>
+  </div>
+</header>
+
+<!-- ── MAP ─────────────────────────────────────── -->
+<main class="map-wrapper">
+  <div class="map-container" id="map-container">
+    <img
+      class="base-map"
+      id="base-map"
+      src="http://localhost:8000/static/base_map.png"
+      alt="World Map"
+      draggable="false"
+    />
+    <div class="borders-layer" id="borders-layer"></div>
+    <div class="map-vignette"></div>
+    <div class="empty-state" id="empty-state">
+      <div class="empty-inner">
+        <div class="empty-star" aria-hidden="true">★</div>
+        <h2 class="empty-title">Be the first<br>to claim land</h2>
+        <p class="empty-sub">Type /place-city in Discord</p>
+      </div>
+    </div>
+  </div>
+</main>
+
+<!-- ── COORD READOUT ───────────────────────────── -->
+<div class="coord-readout" id="coord-readout" aria-hidden="true">
+  <span class="coord-label">X</span>
+  <span class="coord-val" id="coord-x">—</span>
+  <span class="coord-sep">·</span>
+  <span class="coord-label">Y</span>
+  <span class="coord-val" id="coord-y">—</span>
+</div>
+
+<!-- ── INFO PANEL ──────────────────────────────── -->
+<aside class="info-panel" id="info-panel">
+  <div class="panel-stripe"></div>
+  <div class="panel-content">
+    <div class="panel-header">
+      <span class="panel-kicker">Province Intel</span>
+      <button class="panel-close" id="panel-close" aria-label="Close">✕</button>
+    </div>
+    <div class="panel-city-name" id="panel-city-name">—</div>
+    <div class="panel-divider"></div>
+    <div class="data-row">
+      <span class="data-label">Commander</span>
+      <div class="commander-info">
+        <div id="panel-avatar-wrap" class="panel-avatar-placeholder">★</div>
+        <span id="panel-owner-name" class="data-value">—</span>
+      </div>
+    </div>
+    <div class="data-row">
+      <span class="data-label">Grid Ref</span>
+      <span class="data-value" id="panel-coords">—</span>
+    </div>
+    <div class="discord-hint" id="discord-hint" style="display:none">
+      <span class="data-label">Deploy Nearby</span>
+      <code id="discord-hint-cmd">/place-city name:... x:... y:...</code>
+    </div>
+  </div>
+</aside>
+
+<script is:inline>
+(function () {
+  const API    = 'http://localhost:8000';
+  const WS_URL = 'ws://localhost:8000/ws';
+
+  const state = { cities: [], selectedPath: null };
+
+  const mapContainer    = document.getElementById('map-container');
+  const baseMap         = document.getElementById('base-map');
+  const bordersLayer    = document.getElementById('borders-layer');
+  const emptyState      = document.getElementById('empty-state');
+  const coordReadout    = document.getElementById('coord-readout');
+  const coordX          = document.getElementById('coord-x');
+  const coordY          = document.getElementById('coord-y');
+  const playerCount     = document.getElementById('player-count');
+  const infoPanel       = document.getElementById('info-panel');
+  const panelCityName   = document.getElementById('panel-city-name');
+  const panelOwnerName  = document.getElementById('panel-owner-name');
+  const panelAvatarWrap = document.getElementById('panel-avatar-wrap');
+  const panelCoords     = document.getElementById('panel-coords');
+  const panelClose      = document.getElementById('panel-close');
+  const discordHint     = document.getElementById('discord-hint');
+  const discordHintCmd  = document.getElementById('discord-hint-cmd');
+
+  async function init() { await Promise.all([fetchCities(), loadBorders()]); connectWS(); }
+  async function fetchCities() { try { const r = await fetch(`${API}/cities`); state.cities = await r.json(); updatePlayerCount(); } catch { state.cities = []; } }
+  function updatePlayerCount() { const n = state.cities.length; playerCount.innerHTML = n === 0 ? '' : `<span>${n}</span> ${n === 1 ? 'CITY' : 'CITIES'} FOUNDED`; }
+  function syncBordersLayer() { if (!baseMap.naturalWidth) return; const imgRect = baseMap.getBoundingClientRect(); const wrapRect = mapContainer.getBoundingClientRect(); bordersLayer.style.left = (imgRect.left - wrapRect.left) + 'px'; bordersLayer.style.top = (imgRect.top - wrapRect.top) + 'px'; bordersLayer.style.width = imgRect.width + 'px'; bordersLayer.style.height = imgRect.height + 'px'; }
+  baseMap.addEventListener('load', syncBordersLayer); window.addEventListener('resize', syncBordersLayer); if (baseMap.complete) syncBordersLayer();
+  async function loadBorders() { try { const r = await fetch(`${API}/static/data/borders.svg`, { cache: 'no-store' }); if (!r.ok) { checkEmptyState(); return; } injectSVG(await r.text()); } catch { checkEmptyState(); } }
+  function injectSVG(svgText) { const parser = new DOMParser(); const doc = parser.parseFromString(svgText, 'image/svg+xml'); const svg = doc.querySelector('svg'); if (!svg) { checkEmptyState(); return; } svg.setAttribute('width', '100%'); svg.setAttribute('height', '100%'); svg.style.cssText = 'position:absolute;top:0;left:0;'; bordersLayer.innerHTML = svg.outerHTML; syncBordersLayer(); bindProvinceEvents(); checkEmptyState(); }
+  function checkEmptyState() { emptyState.classList.toggle('visible', bordersLayer.querySelectorAll('path').length === 0); }
+  function bindProvinceEvents() { bordersLayer.querySelectorAll('path').forEach(path => { path.setAttribute('pointer-events', 'all'); path.addEventListener('click', onProvinceClick); }); }
+  function onProvinceClick(e) { e.stopPropagation(); const path = e.currentTarget; const cityId = path.getAttribute('id'); const city = state.cities.find(c => c.id === cityId); if (state.selectedPath) state.selectedPath.classList.remove('selected'); path.classList.add('selected'); state.selectedPath = path; showInfoPanel(city, cityId, path.getAttribute('data-owner')); }
+  function showInfoPanel(city, cityId, ownerId) { if (city) { panelCityName.textContent = city.name || cityId; panelOwnerName.textContent = city.username || ownerId || 'Unknown'; panelCoords.textContent = `${city.x}, ${city.y}`; if (city.avatar && city.owner_id) { panelAvatarWrap.innerHTML = `<img class="panel-avatar" src="https://cdn.discordapp.com/avatars/${city.owner_id}/${city.avatar}.png?size=64" alt="${city.username}" />`; panelAvatarWrap.className = ''; } else { panelAvatarWrap.innerHTML = '★'; panelAvatarWrap.className = 'panel-avatar-placeholder'; } discordHintCmd.textContent = `/place-city name:YourCity x:${city.x} y:${city.y}`; discordHint.style.display = ''; } else { panelCityName.textContent = cityId || '—'; panelOwnerName.textContent = ownerId || 'Unknown'; panelAvatarWrap.innerHTML = '★'; panelAvatarWrap.className = 'panel-avatar-placeholder'; panelCoords.textContent = '—'; discordHint.style.display = 'none'; } infoPanel.classList.add('open'); }
+  panelClose.addEventListener('click', closeInfoPanel);
+  function closeInfoPanel() { infoPanel.classList.remove('open'); if (state.selectedPath) { state.selectedPath.classList.remove('selected'); state.selectedPath = null; } }
+  mapContainer.addEventListener('click', e => { if (!e.target.closest('path')) closeInfoPanel(); });
+  mapContainer.addEventListener('mousemove', e => { const coords = getMapCoords(e); if (coords) { coordX.textContent = coords.x; coordY.textContent = coords.y; coordReadout.classList.add('visible'); } else { coordReadout.classList.remove('visible'); } });
+  mapContainer.addEventListener('mouseleave', () => { coordReadout.classList.remove('visible'); });
+  function getMapCoords(e) { const rect = baseMap.getBoundingClientRect(); if (e.clientX < rect.left || e.clientX > rect.right || e.clientY < rect.top || e.clientY > rect.bottom) return null; const scaleX = baseMap.naturalWidth / rect.width; const scaleY = baseMap.naturalHeight / rect.height; return { x: Math.round((e.clientX - rect.left) * scaleX), y: Math.round((e.clientY - rect.top) * scaleY) }; }
+  function connectWS() { let retryDelay = 2000; function open() { const ws = new WebSocket(WS_URL); ws.onopen = () => { retryDelay = 2000; }; ws.onmessage = e => { try { const data = JSON.parse(e.data); if (data.type === 'borders_update') { injectSVG(data.svg); fetchCities().then(updatePlayerCount); } } catch {} }; ws.onclose = () => { setTimeout(open, retryDelay); retryDelay = Math.min(retryDelay * 1.5, 30000); }; } open(); }
+  init();
+})();
+</script>
+
+</body>
+</html>
