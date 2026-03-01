@@ -9,13 +9,14 @@ Discord OAuth is kept so the web can show ownership identity.
 import asyncio
 import json
 import os
-import sqlite3
 import sys
 import uuid
 from pathlib import Path
 from typing import Optional
 
 import httpx
+import psycopg2
+import psycopg2.extras
 from authlib.integrations.starlette_client import OAuth
 from dotenv import load_dotenv
 from fastapi import FastAPI, Header, HTTPException, WebSocket, WebSocketDisconnect, Request
@@ -29,17 +30,17 @@ from starlette.middleware.sessions import SessionMiddleware
 load_dotenv(Path(__file__).parent.parent / ".env")
 
 ROOT         = Path(__file__).parent.parent
-DB_PATH      = ROOT / "data" / "voronoi.db"
 CITIES_FILE  = ROOT / "data" / "cities.json"
 BORDERS_SVG  = ROOT / "data" / "borders.svg"
 TERRAIN_MAP  = ROOT / "terrain_map.png"
 PREPROCESSOR = ROOT / "preprocessor" / "process.py"
 
-DISCORD_CLIENT_ID     = os.getenv("DISCORD_CLIENT_ID", "")
-DISCORD_CLIENT_SECRET = os.getenv("DISCORD_CLIENT_SECRET", "")
-DISCORD_REDIRECT_URI  = os.getenv("DISCORD_REDIRECT_URI", "http://localhost:8000/auth/callback")
-SECRET_KEY            = os.getenv("SECRET_KEY", "change-me-in-production")
-BOT_SECRET            = os.getenv("BOT_SECRET", "")
+DATABASE_URL              = os.getenv("DATABASE_URL", "")
+DISCORD_CLIENT_ID         = os.getenv("DISCORD_CLIENT_ID", "")
+DISCORD_CLIENT_SECRET     = os.getenv("DISCORD_CLIENT_SECRET", "")
+DISCORD_REDIRECT_URI      = os.getenv("DISCORD_REDIRECT_URI", "http://localhost:8000/auth/callback")
+SECRET_KEY                = os.getenv("SECRET_KEY", "change-me-in-production")
+BOT_SECRET                = os.getenv("BOT_SECRET", "")
 
 # --------------------------------------------------------------------------- #
 # App
@@ -69,22 +70,23 @@ oauth.register(
 # --------------------------------------------------------------------------- #
 # Database
 # --------------------------------------------------------------------------- #
-def get_db() -> sqlite3.Connection:
-    conn = sqlite3.connect(str(DB_PATH))
-    conn.row_factory = sqlite3.Row
+def get_db() -> psycopg2.extensions.connection:
+    conn = psycopg2.connect(DATABASE_URL)
     return conn
 
 
 def init_db():
-    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     conn = get_db()
-    conn.executescript("""
+    cur = conn.cursor()
+    cur.execute("""
         CREATE TABLE IF NOT EXISTS players (
             discord_id TEXT PRIMARY KEY,
             username   TEXT,
             avatar     TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        );
+        )
+    """)
+    cur.execute("""
         CREATE TABLE IF NOT EXISTS cities (
             id         TEXT PRIMARY KEY,
             name       TEXT NOT NULL,
@@ -92,16 +94,16 @@ def init_db():
             y          INTEGER NOT NULL,
             owner_id   TEXT REFERENCES players(discord_id),
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        );
+        )
     """)
     conn.commit()
+    cur.close()
     conn.close()
 
 
 init_db()
 
 # Static files: /static/* → project root
-# Exposes: /static/base_map.png, /static/data/borders.svg, etc.
 app.mount("/static", StaticFiles(directory=str(ROOT)), name="static")
 
 # --------------------------------------------------------------------------- #
@@ -164,7 +166,10 @@ manager = ConnectionManager()
 # --------------------------------------------------------------------------- #
 def db_to_cities_json():
     conn = get_db()
-    rows = conn.execute("SELECT id, name, x, y, owner_id FROM cities").fetchall()
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    cur.execute("SELECT id, name, x, y, owner_id FROM cities")
+    rows = cur.fetchall()
+    cur.close()
     conn.close()
     cities = [
         {"id": r["id"], "name": r["name"], "x": r["x"], "y": r["y"], "owner": r["owner_id"]}
@@ -175,8 +180,6 @@ def db_to_cities_json():
 
 
 async def run_preprocessor() -> str:
-    # asyncio.create_subprocess_exec doesn't work on Windows with uvicorn's
-    # SelectorEventLoop, so run the subprocess synchronously in a thread.
     import subprocess
     from functools import partial
 
@@ -196,7 +199,6 @@ async def run_preprocessor() -> str:
 
 
 def require_bot_secret(x_bot_secret: str = Header(default="")):
-    """FastAPI dependency — validates the X-Bot-Secret header."""
     if not BOT_SECRET:
         raise HTTPException(status_code=500, detail="BOT_SECRET not configured on server")
     if x_bot_secret != BOT_SECRET:
@@ -204,7 +206,6 @@ def require_bot_secret(x_bot_secret: str = Header(default="")):
 
 
 async def _do_place_city(discord_id: str, name: str, x: int, y: int) -> dict:
-    """Shared city-placement logic used by both the bot endpoint and any future callers."""
     W, H = _map_size
     if W > 0 and (x < 0 or x >= W or y < 0 or y >= H):
         raise HTTPException(status_code=400, detail="Coordinates out of bounds")
@@ -213,34 +214,38 @@ async def _do_place_city(discord_id: str, name: str, x: int, y: int) -> dict:
         raise HTTPException(status_code=400, detail="Cannot place a city on water")
 
     conn = get_db()
-    existing = conn.execute(
-        "SELECT id FROM cities WHERE owner_id = ?", (discord_id,)
-    ).fetchone()
-    if existing:
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+
+    cur.execute("SELECT id FROM cities WHERE owner_id = %s", (discord_id,))
+    if cur.fetchone():
+        cur.close()
         conn.close()
         raise HTTPException(status_code=400, detail="You already have a city")
 
     city_id = name.lower().replace(" ", "-") + "-" + uuid.uuid4().hex[:6]
 
-    # Run preprocessor BEFORE committing — roll back if it fails
-    conn.execute(
-        "INSERT INTO cities (id, name, x, y, owner_id) VALUES (?, ?, ?, ?, ?)",
+    cur.execute(
+        "INSERT INTO cities (id, name, x, y, owner_id) VALUES (%s, %s, %s, %s, %s)",
         (city_id, name, x, y, discord_id),
     )
-    # Flush to cities.json so the preprocessor sees it, but don't commit yet
-    rows = conn.execute("SELECT id, name, x, y, owner_id FROM cities").fetchall()
+
+    # Flush to cities.json so preprocessor sees it, but don't commit yet
+    cur.execute("SELECT id, name, x, y, owner_id FROM cities")
+    rows = cur.fetchall()
     cities = [{"id": r["id"], "name": r["name"], "x": r["x"], "y": r["y"], "owner": r["owner_id"]} for r in rows]
     CITIES_FILE.write_text(json.dumps(cities, indent=2), encoding="utf-8")
 
     try:
         svg = await run_preprocessor()
     except RuntimeError as e:
+        conn.rollback()
+        cur.close()
         conn.close()
-        # Revert cities.json to what was committed before
         db_to_cities_json()
         raise HTTPException(status_code=500, detail=str(e))
 
     conn.commit()
+    cur.close()
     conn.close()
 
     await manager.broadcast({"type": "borders_update", "svg": svg})
@@ -248,7 +253,7 @@ async def _do_place_city(discord_id: str, name: str, x: int, y: int) -> dict:
     return {"id": city_id, "name": name, "x": x, "y": y, "owner": discord_id}
 
 # --------------------------------------------------------------------------- #
-# Bot endpoints  (called by bot/bot.py)
+# Bot endpoints
 # --------------------------------------------------------------------------- #
 class BotPlaceCityRequest(BaseModel):
     discord_id: str
@@ -262,25 +267,25 @@ class BotPlaceCityRequest(BaseModel):
 @app.post("/bot/city")
 async def bot_place_city(
     body: BotPlaceCityRequest,
-    _: None = None,  # placeholder; dependency injected below
     x_bot_secret: str = Header(default=""),
 ):
     require_bot_secret(x_bot_secret)
 
-    # Upsert player from bot-supplied identity
     conn = get_db()
-    conn.execute(
-        "INSERT INTO players (discord_id, username, avatar) VALUES (?, ?, ?)"
-        " ON CONFLICT(discord_id) DO UPDATE SET username=excluded.username, avatar=excluded.avatar",
+    cur = conn.cursor()
+    cur.execute(
+        "INSERT INTO players (discord_id, username, avatar) VALUES (%s, %s, %s)"
+        " ON CONFLICT (discord_id) DO UPDATE SET username=EXCLUDED.username, avatar=EXCLUDED.avatar",
         (body.discord_id, body.username, body.avatar or ""),
     )
     conn.commit()
+    cur.close()
     conn.close()
 
     return await _do_place_city(body.discord_id, body.name, body.x, body.y)
 
 # --------------------------------------------------------------------------- #
-# Discord OAuth  (optional — lets web show ownership identity)
+# Discord OAuth
 # --------------------------------------------------------------------------- #
 @app.get("/auth/discord")
 async def auth_discord(request: Request):
@@ -301,12 +306,14 @@ async def auth_callback(request: Request):
     avatar     = user.get("avatar", "")
 
     conn = get_db()
-    conn.execute(
-        "INSERT INTO players (discord_id, username, avatar) VALUES (?, ?, ?)"
-        " ON CONFLICT(discord_id) DO UPDATE SET username=excluded.username, avatar=excluded.avatar",
+    cur = conn.cursor()
+    cur.execute(
+        "INSERT INTO players (discord_id, username, avatar) VALUES (%s, %s, %s)"
+        " ON CONFLICT (discord_id) DO UPDATE SET username=EXCLUDED.username, avatar=EXCLUDED.avatar",
         (discord_id, username, avatar),
     )
     conn.commit()
+    cur.close()
     conn.close()
 
     request.session["discord_id"] = discord_id
@@ -339,10 +346,13 @@ async def me(request: Request):
 @app.get("/cities")
 async def get_cities():
     conn = get_db()
-    rows = conn.execute(
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    cur.execute(
         "SELECT c.id, c.name, c.x, c.y, c.owner_id, p.username, p.avatar "
         "FROM cities c JOIN players p ON c.owner_id = p.discord_id"
-    ).fetchall()
+    )
+    rows = cur.fetchall()
+    cur.close()
     conn.close()
     return [dict(r) for r in rows]
 

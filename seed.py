@@ -5,41 +5,48 @@ Edit the CITIES list below to place cities wherever you want.
 """
 
 import json
-import sqlite3
+import os
 import subprocess
 import sys
 from pathlib import Path
 
-ROOT       = Path(__file__).parent
-DB_PATH    = ROOT / "data" / "voronoi.db"
+import psycopg2
+from dotenv import load_dotenv
+
+ROOT        = Path(__file__).parent
 CITIES_FILE = ROOT / "data" / "cities.json"
 
-# ── Add your test cities here ──────────────────────────────────────────────
+load_dotenv(ROOT / ".env")
+DATABASE_URL = os.getenv("DATABASE_URL", "")
+
+# -- Add your test cities here -----------------------------------------------
 CITIES = [
-    {"id": "ashport",   "name": "Ashport",   "x": 2314, "y": 735,  "owner": "test_user_1"}
+    {"id": "ashport", "name": "Ashport", "x": 2314, "y": 735, "owner": "test_user_1"}
 ]
-# ──────────────────────────────────────────────────────────────────────────
+# ----------------------------------------------------------------------------
 
 def main():
-    conn = sqlite3.connect(str(DB_PATH))
+    conn = psycopg2.connect(DATABASE_URL)
+    cur = conn.cursor()
 
     # Upsert fake players
     for city in CITIES:
-        conn.execute(
-            "INSERT INTO players (discord_id, username, avatar) VALUES (?, ?, ?)"
-            " ON CONFLICT(discord_id) DO NOTHING",
+        cur.execute(
+            "INSERT INTO players (discord_id, username, avatar) VALUES (%s, %s, %s)"
+            " ON CONFLICT (discord_id) DO NOTHING",
             (city["owner"], city["name"] + "_player", ""),
         )
 
     # Clear existing cities and insert test set
-    conn.execute("DELETE FROM cities")
+    cur.execute("DELETE FROM cities")
     for city in CITIES:
-        conn.execute(
-            "INSERT INTO cities (id, name, x, y, owner_id) VALUES (?, ?, ?, ?, ?)",
+        cur.execute(
+            "INSERT INTO cities (id, name, x, y, owner_id) VALUES (%s, %s, %s, %s, %s)",
             (city["id"], city["name"], city["x"], city["y"], city["owner"]),
         )
 
     conn.commit()
+    cur.close()
     conn.close()
 
     # Sync cities.json
