@@ -50,7 +50,11 @@ app = FastAPI()
 app.add_middleware(SessionMiddleware, secret_key=SECRET_KEY)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:4321", "http://localhost:3000"],
+    allow_origins=[
+        "http://localhost:4321",
+        "http://localhost:3000",
+        "https://shapes-and-states.vercel.app",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
