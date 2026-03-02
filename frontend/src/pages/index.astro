@@ -12,7 +12,7 @@ const PUBLIC_WS_URL = import.meta.env.PUBLIC_WS_URL;
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Barlow+Condensed:ital,wght@0,300;0,400;0,500;0,600;1,400&display=swap" rel="stylesheet" />
 
-  <style>
+  <style is:global>
     /* ── RESET & BASE ──────────────────────────────── */
     *, *::before, *::after { 
       box-sizing: border-box; 
@@ -382,21 +382,29 @@ const PUBLIC_WS_URL = import.meta.env.PUBLIC_WS_URL;
     requestAnimationFrame(renderLoop);
   }
 
+  function openCityPanel(city, pathId) {
+    document.querySelectorAll('path.selected').forEach(p => p.classList.remove('selected'));
+    const id = city ? city.id : pathId;
+    if (id) document.querySelectorAll(`.borders-layer path[id="${id}"]`).forEach(p => p.classList.add('selected'));
+    document.getElementById('info-city-name').textContent = city ? city.name : (id || '—');
+    document.getElementById('info-owner-name').textContent = city ? (city.username || 'Citizen') : 'Neutral Territory';
+    document.getElementById('info-coords').textContent = city ? `${city.x}, ${city.y}` : 'Unmapped';
+    ui.info.classList.add('open');
+    ui.card.classList.remove('visible');
+  }
+
   function renderBorders() {
     if (!state.bordersSvg || !state.isReady) return;
     document.querySelectorAll('.borders-layer').forEach(layer => {
       layer.innerHTML = state.bordersSvg;
+      // Set pointer-events/cursor inline as belt-and-suspenders.
+      // CSS is handled by <style is:global> which now applies to injected SVG.
       layer.querySelectorAll('path').forEach(path => {
+        path.style.pointerEvents = 'all';
+        path.style.cursor = 'pointer';
         path.addEventListener('click', (e) => {
           e.stopPropagation();
-          const city = state.cities.find(c => c.id === path.id);
-          document.querySelectorAll('path.selected').forEach(p => p.classList.remove('selected'));
-          document.querySelectorAll(`.borders-layer path[id="${path.id}"]`).forEach(p => p.classList.add('selected'));
-          document.getElementById('info-city-name').textContent = city ? city.name : path.id;
-          document.getElementById('info-owner-name').textContent = city ? (city.username || 'Citizen') : 'Neutral Territory';
-          document.getElementById('info-coords').textContent = city ? `${city.x}, ${city.y}` : 'Unmapped';
-          ui.info.classList.add('open');
-          ui.card.classList.remove('visible');
+          openCityPanel(state.cities.find(c => c.id === path.id), path.id);
         });
       });
     });
@@ -412,12 +420,7 @@ const PUBLIC_WS_URL = import.meta.env.PUBLIC_WS_URL;
         m.style.pointerEvents = 'auto'; m.style.cursor = 'pointer';
         m.addEventListener('click', (e) => {
           e.stopPropagation();
-          document.querySelectorAll('path.selected').forEach(p => p.classList.remove('selected'));
-          document.querySelectorAll(`.borders-layer path[id="${c.id}"]`).forEach(p => p.classList.add('selected'));
-          document.getElementById('info-city-name').textContent = c.name;
-          document.getElementById('info-owner-name').textContent = c.username || 'Citizen';
-          document.getElementById('info-coords').textContent = `${c.x}, ${c.y}`;
-          ui.info.classList.add('open'); ui.card.classList.remove('visible');
+          openCityPanel(c, c.id);
         });
         layer.appendChild(m);
       });
