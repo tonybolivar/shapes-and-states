@@ -128,6 +128,7 @@ const PUBLIC_WS_URL = import.meta.env.PUBLIC_WS_URL;
     }
     .borders-layer path.selected {
       opacity: 1;
+      fill: #000 !important;
       stroke: #fff;
       stroke-width: 4;
     }
@@ -322,8 +323,10 @@ const PUBLIC_WS_URL = import.meta.env.PUBLIC_WS_URL;
       el.style.width = state.mapWidth + 'px'; el.style.height = state.mapHeight + 'px'; 
     });
     const vW = window.innerWidth; const vH = ui.wrapper.clientHeight;
-    state.target.panX = (vW / 2) - state.mapWidth; 
-    state.target.panY = (vH / 2) - (state.mapHeight / 2);
+    const initZoom = 0.4; const cx = 2506, cy = 970;
+    state.target.zoom = initZoom; state.current.zoom = initZoom;
+    state.target.panX = (vW / 2) - cx * initZoom;
+    state.target.panY = (vH / 2) - cy * initZoom;
     state.current.panX = state.target.panX; state.current.panY = state.target.panY;
     state.isReady = true; renderBorders(); renderCities();
   }
