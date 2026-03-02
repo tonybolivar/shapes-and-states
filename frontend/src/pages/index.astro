@@ -1,4 +1,6 @@
 ---
+const PUBLIC_API_URL = import.meta.env.PUBLIC_API_URL;
+const PUBLIC_WS_URL = import.meta.env.PUBLIC_WS_URL;
 ---
 <!doctype html>
 <html lang="en">
@@ -263,11 +265,12 @@
   <button class="zoom-btn" data-zoom="out">−</button>
 </div>
 
-<script is:inline>
+<script is:inline define:vars={{ PUBLIC_API_URL, PUBLIC_WS_URL }}>
 (function() {
   const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-  const API = isLocal ? 'http://localhost:8000' : 'https://shapes-and-states-production.up.railway.app';
-  const WS_URL = isLocal ? 'ws://localhost:8000/ws' : 'wss://shapes-and-states-production.up.railway.app/ws';
+  const API_URL = PUBLIC_API_URL || (isLocal ? 'http://localhost:8000' : window.location.origin.replace('4321', '8000'));
+  const WS_URL = PUBLIC_WS_URL || API_URL.replace('http', 'ws') + '/ws';
+  const API = API_URL;
 
   const state = {
     cities: [], user: null, mode: 'view', bordersSvg: '',
@@ -486,7 +489,7 @@
       };
     });
 
-    document.getElementById('info-close').onclick = () => { ui.info.classList.remove('open'); document.querySelectorAll('path.selected').forEach(p => p.classList.remove('selected')); };
+    document.getElementById('info-close').onclick = () => { ui.info.classList.remove('open'); document.querySelectorAll('path.selected').forEach(s => s.classList.remove('selected')); };
     
     document.querySelectorAll('.zoom-btn').forEach(btn => {
       btn.onclick = () => {

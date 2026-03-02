@@ -1,5 +1,36 @@
-.claude/
+# Environments
 .env
+.env.*
+!.env.example
+
+# Python
 __pycache__/
 *.pyc
-data/voronoi.db
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv/
+pip-log.txt
+
+# Databases
+*.db
+*.sqlite3
+!sns.db.example # Optional: if you ever want to provide a template DB
+
+# Node / Astro
+node_modules/
+dist/
+.astro/
+.vercel
+.netlify
+.cache/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Project Specific
+data/borders.svg
+# Note: Maps are NOT ignored here so the repo is functional out of the box.
