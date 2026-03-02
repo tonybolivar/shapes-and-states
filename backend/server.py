@@ -243,7 +243,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.add_middleware(SessionMiddleware, secret_key=SECRET_KEY, session_cookie="sns_session", same_site="lax")
+app.add_middleware(SessionMiddleware, secret_key=SECRET_KEY, session_cookie="sns_session", same_site="none", https_only=True)
 
 oauth = OAuth()
 oauth.register(
