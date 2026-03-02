@@ -1,9 +1,7 @@
 """
-Shapes & States — FastAPI Backend
-
-City placement is handled exclusively by the Discord bot via POST /bot/city.
-The web frontend is a read-only viewer (cities + live SVG borders via WebSocket).
-Discord OAuth is kept so the web can show ownership identity.
+Shapes & States — Optimized FastAPI Backend
+Primary Store: cities.json | Player Data: DB
+Integrated Voronoi Preprocessor for high performance.
 """
 
 import asyncio
@@ -11,54 +9,234 @@ import json
 import os
 import sys
 import uuid
+import sqlite3
+import traceback
+import hashlib
+import heapq
 from pathlib import Path
-from typing import Optional
+from typing import Optional, List, Dict, Any
+from functools import partial
 
 import httpx
+import numpy as np
 import psycopg2
 import psycopg2.extras
 from authlib.integrations.starlette_client import OAuth
 from dotenv import load_dotenv
 from fastapi import FastAPI, Header, HTTPException, WebSocket, WebSocketDisconnect, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi.responses import JSONResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
-from PIL import Image
 from pydantic import BaseModel
 from starlette.middleware.sessions import SessionMiddleware
+from PIL import Image
 
+# ─── CONFIGURATION ───────────────────────────────────────────────────────── #
 load_dotenv(Path(__file__).parent.parent / ".env")
 
 ROOT         = Path(__file__).parent.parent
-CITIES_FILE  = ROOT / "data" / "cities.json"
-BORDERS_SVG  = ROOT / "data" / "borders.svg"
-TERRAIN_MAP  = ROOT / "terrain_map.png"
-PREPROCESSOR = ROOT / "preprocessor" / "process.py"
+DATA_DIR     = ROOT / "data"
+CITIES_FILE  = DATA_DIR / "cities.json"
+BORDERS_SVG  = DATA_DIR / "borders.svg"
+TERRAIN_MAP  = ROOT / "backend" / "static" / "terrain_map.png"
 
-DATABASE_URL              = os.getenv("DATABASE_URL", "")
-DISCORD_CLIENT_ID         = os.getenv("DISCORD_CLIENT_ID", "")
-DISCORD_CLIENT_SECRET     = os.getenv("DISCORD_CLIENT_SECRET", "")
-DISCORD_REDIRECT_URI      = os.getenv("DISCORD_REDIRECT_URI", "http://localhost:8000/auth/callback")
-SECRET_KEY                = os.getenv("SECRET_KEY", "change-me-in-production")
-BOT_SECRET                = os.getenv("BOT_SECRET", "")
+DATABASE_URL = os.getenv("DATABASE_URL", "")
+SECRET_KEY   = os.getenv("SECRET_KEY", "sns-secret-12345")
+WEB_URL      = os.getenv("WEB_URL", "http://localhost:4321")
+BOT_TOKEN    = os.getenv("BOT_TOKEN", "")
+BOT_SECRET   = os.getenv("BOT_SECRET", "")
+GUILD_ID     = "1477201832433549313"
 
-# --------------------------------------------------------------------------- #
-# App
-# --------------------------------------------------------------------------- #
-app = FastAPI()
+DISCORD_CLIENT_ID     = os.getenv("DISCORD_CLIENT_ID", "")
+DISCORD_CLIENT_SECRET = os.getenv("DISCORD_CLIENT_SECRET", "")
+DISCORD_REDIRECT_URI  = os.getenv("DISCORD_REDIRECT_URI", "http://localhost:8000/auth/callback")
+DEBUG_MODE            = os.getenv("DEBUG_MODE", "false").lower() == "true"
 
-app.add_middleware(SessionMiddleware, secret_key=SECRET_KEY)
+# ─── PREPROCESSOR CONSTANTS ─────────────────────────────────────────────── #
+TERRAIN_COSTS = {
+    (102, 234, 255): 999,  # water
+    (68,  61,  49):  10,   # mountains
+    (89,  87, 124):  7,    # hills
+    (78, 130,  76):  4,    # forest
+    (190, 162, 226): 6,    # tundra
+    (255, 255, 255): 2,    # plains
+}
+DEFAULT_COST = 3
+WATER_COST = 999
+IMPASSABLE = float("inf")
+MAX_COST = 160
+
+# ─── DATABASE ENGINE (Players Only) ──────────────────────────────────────── #
+class Database:
+    def __init__(self):
+        self.is_sqlite = not DATABASE_URL or not DATABASE_URL.startswith("postgres")
+        self.init_db()
+
+    def get_conn(self):
+        if self.is_sqlite:
+            conn = sqlite3.connect(ROOT / "sns.db", check_same_thread=False)
+            conn.row_factory = sqlite3.Row
+            return conn
+        try:
+            return psycopg2.connect(DATABASE_URL, connect_timeout=3)
+        except Exception as e:
+            print(f"Postgres failed ({e}), falling back to SQLite.")
+            self.is_sqlite = True
+            return self.get_conn()
+
+    def init_db(self):
+        with self.get_conn() as conn:
+            cur = conn.cursor()
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS players (
+                    discord_id TEXT PRIMARY KEY,
+                    username   TEXT,
+                    avatar     TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            conn.commit()
+
+    def execute(self, query: str, params: tuple = (), fetch: bool = False):
+        sql = query.replace("%s", "?") if self.is_sqlite else query
+        with self.get_conn() as conn:
+            cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) if not self.is_sqlite and fetch else conn.cursor()
+            cur.execute(sql, params)
+            if fetch:
+                rows = cur.fetchall()
+                return [dict(r) for r in rows]
+            conn.commit()
+            return None
+
+db = Database()
+
+# ─── CITIES JSON HELPERS ─────────────────────────────────────────────────── #
+def read_cities() -> List[Dict[str, Any]]:
+    if not CITIES_FILE.exists(): return []
+    try: return json.loads(CITIES_FILE.read_text(encoding="utf-8"))
+    except: return []
+
+def write_cities(cities: List[Dict[str, Any]]):
+    CITIES_FILE.write_text(json.dumps(cities, indent=2, ensure_ascii=False), encoding="utf-8")
+
+# ─── INTEGRATED PREPROCESSOR LOGIC ───────────────────────────────────────── #
+_cost_grid_cache: Optional[np.ndarray] = None
+_terrain_img_cache: Optional[Image.Image] = None
+
+def get_cost_grid() -> np.ndarray:
+    global _cost_grid_cache
+    if _cost_grid_cache is not None: return _cost_grid_cache
+    
+    if not TERRAIN_MAP.exists():
+        return np.full((1000, 1000), DEFAULT_COST, dtype=np.float32)
+
+    img = Image.open(TERRAIN_MAP).convert("RGB")
+    pixels = np.array(img, dtype=np.uint8)
+    H, W = pixels.shape[:2]
+    costs = np.full((H, W), DEFAULT_COST, dtype=np.float32)
+
+    unique_colours = {rgb: (float(IMPASSABLE) if cost >= WATER_COST else float(cost)) 
+                     for rgb, cost in TERRAIN_COSTS.items()}
+
+    for rgb, cost in unique_colours.items():
+        r, g, b = rgb
+        mask = (pixels[:, :, 0] == r) & (pixels[:, :, 1] == g) & (pixels[:, :, 2] == b)
+        costs[mask] = cost
+
+    _cost_grid_cache = costs
+    return costs
+
+def is_water(x: int, y: int) -> bool:
+    grid = get_cost_grid()
+    H, W = grid.shape
+    if x < 0 or x >= W or y < 0 or y >= H: return True
+    return grid[y, x] >= WATER_COST
+
+def city_color(city_id: str) -> str:
+    hue = int(hashlib.md5(city_id.encode()).hexdigest()[:4], 16) % 360
+    return f"hsla({hue},65%,52%,0.55)"
+
+def generate_borders_svg(cities: List[Dict[str, Any]]) -> str:
+    cost_grid = get_cost_grid()
+    H, W = cost_grid.shape
+    
+    if not cities:
+        return f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {W} {H}"></svg>'
+
+    # Multi-source Dijkstra
+    dist = np.full((H, W), np.inf, dtype=np.float64)
+    owner = np.full((H, W), -1, dtype=np.int32)
+    heap = []
+    
+    for idx, c in enumerate(cities):
+        cx, cy = int(c["x"]), int(c["y"])
+        if 0 <= cy < H and 0 <= cx < W and cost_grid[cy, cx] < WATER_COST:
+            dist[cy, cx] = 0.0
+            owner[cy, cx] = idx
+            heapq.heappush(heap, (0.0, cy, cx, idx))
+
+    neighbours = [(-1, 0), (1, 0), (0, -1), (0, 1)]
+    while heap:
+        d, r, c, city_idx = heapq.heappop(heap)
+        if d > dist[r, c]: continue
+        for dr, dc in neighbours:
+            nr, nc = r + dr, c + dc
+            if 0 <= nr < H and 0 <= nc < W:
+                cell_cost = cost_grid[nr, nc]
+                if cell_cost < WATER_COST:
+                    nd = d + cell_cost
+                    if nd <= MAX_COST and nd < dist[nr, nc]:
+                        dist[nr, nc] = nd
+                        owner[nr, nc] = city_idx
+                        heapq.heappush(heap, (nd, nr, nc, city_idx))
+
+    # Trace borders
+    try:
+        from skimage import measure
+        use_skimage = True
+    except ImportError:
+        use_skimage = False
+
+    paths = []
+    for idx, city in enumerate(cities):
+        mask = (owner == idx).astype(np.uint8)
+        if mask.sum() == 0: continue
+        
+        if use_skimage:
+            contours = measure.find_contours(mask.astype(float), level=0.5)
+            d_parts = []
+            for contour in contours:
+                coords = [(round(float(p[1]), 1), round(float(p[0]), 1)) for p in contour]
+                d_parts.append("M " + " L ".join(f"{x},{y}" for x, y in coords) + " Z")
+            d = " ".join(d_parts) if d_parts else ""
+        else:
+            rows, cols = np.where(mask)
+            r0, r1, c0, c1 = rows.min(), rows.max(), cols.min(), cols.max()
+            d = f"M {c0},{r0} L {c1},{r0} L {c1},{r1} L {c0},{r1} Z"
+
+        if d:
+            paths.append(f'  <path id="{city["id"]}" data-owner="{city.get("owner","")}" fill="{city_color(city["id"])}" d="{d}" />')
+
+    return f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {W} {H}">\n' + "\n".join(paths) + '\n</svg>'
+
+async def update_borders():
+    cities = read_cities()
+    svg = await asyncio.get_event_loop().run_in_executor(None, generate_borders_svg, cities)
+    BORDERS_SVG.write_text(svg, encoding="utf-8")
+    return svg
+
+# ─── APP SETUP ───────────────────────────────────────────────────────────── #
+app = FastAPI(title="Shapes & States API")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:4321",
-        "http://localhost:3000",
-        "https://shapes-and-states.vercel.app",
-    ],
+    allow_origins=["http://localhost:4321", "http://127.0.0.1:4321", WEB_URL],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.add_middleware(SessionMiddleware, secret_key=SECRET_KEY, session_cookie="sns_session", same_site="lax")
 
 oauth = OAuth()
 oauth.register(
@@ -71,315 +249,122 @@ oauth.register(
     client_kwargs={"scope": "identify"},
 )
 
-# --------------------------------------------------------------------------- #
-# Database
-# --------------------------------------------------------------------------- #
-def get_db() -> psycopg2.extensions.connection:
-    conn = psycopg2.connect(DATABASE_URL)
-    return conn
+app.mount("/static", StaticFiles(directory=str(ROOT / "backend" / "static")), name="static")
+app.mount("/data", StaticFiles(directory=str(DATA_DIR)), name="data")
 
-
-def init_db():
-    conn = get_db()
-    cur = conn.cursor()
-    cur.execute("""
-        CREATE TABLE IF NOT EXISTS players (
-            discord_id TEXT PRIMARY KEY,
-            username   TEXT,
-            avatar     TEXT,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    """)
-    cur.execute("""
-        CREATE TABLE IF NOT EXISTS cities (
-            id         TEXT PRIMARY KEY,
-            name       TEXT NOT NULL,
-            x          INTEGER NOT NULL,
-            y          INTEGER NOT NULL,
-            owner_id   TEXT REFERENCES players(discord_id),
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    """)
-    conn.commit()
-    cur.close()
-    conn.close()
-
-
-init_db()
-
-# Static files: /static/* → project root
-app.mount("/static", StaticFiles(directory=str(ROOT)), name="static")
-
-# --------------------------------------------------------------------------- #
-# Terrain helpers
-# --------------------------------------------------------------------------- #
-_terrain_img: Optional[Image.Image] = None
-_map_size: tuple[int, int] = (0, 0)
-
-WATER_RGB = (102, 234, 255)
-
-
-def load_terrain():
-    global _terrain_img, _map_size
-    if TERRAIN_MAP.exists():
-        _terrain_img = Image.open(TERRAIN_MAP).convert("RGB")
-        _map_size = _terrain_img.size
-
-
-load_terrain()
-
-
-def is_water(x: int, y: int) -> bool:
-    if _terrain_img is None:
-        return False
-    W, H = _map_size
-    if x < 0 or x >= W or y < 0 or y >= H:
-        return True
-    return _terrain_img.getpixel((x, y))[:3] == WATER_RGB
-
-# --------------------------------------------------------------------------- #
-# WebSocket manager
-# --------------------------------------------------------------------------- #
 class ConnectionManager:
-    def __init__(self):
-        self._clients: list[WebSocket] = []
-
-    async def connect(self, ws: WebSocket):
-        await ws.accept()
-        self._clients.append(ws)
-
-    def disconnect(self, ws: WebSocket):
-        if ws in self._clients:
-            self._clients.remove(ws)
-
-    async def broadcast(self, payload: dict):
-        dead = []
-        for ws in self._clients:
-            try:
-                await ws.send_json(payload)
-            except Exception:
-                dead.append(ws)
-        for ws in dead:
-            self._clients.remove(ws)
-
+    def __init__(self): self.active = []
+    async def connect(self, ws): await ws.accept(); self.active.append(ws)
+    def disconnect(self, ws): 
+        if ws in self.active: self.active.remove(ws)
+    async def broadcast(self, data):
+        for ws in self.active:
+            try: await ws.send_json(data)
+            except: pass
 
 manager = ConnectionManager()
 
-# --------------------------------------------------------------------------- #
-# Shared helpers
-# --------------------------------------------------------------------------- #
-def db_to_cities_json():
-    conn = get_db()
-    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
-    cur.execute("SELECT id, name, x, y, owner_id FROM cities")
-    rows = cur.fetchall()
-    cur.close()
-    conn.close()
-    cities = [
-        {"id": r["id"], "name": r["name"], "x": r["x"], "y": r["y"], "owner": r["owner_id"]}
-        for r in rows
-    ]
-    CITIES_FILE.write_text(json.dumps(cities, indent=2), encoding="utf-8")
-    return cities
-
-
-async def run_preprocessor() -> str:
-    import subprocess
-    from functools import partial
-
-    loop = asyncio.get_event_loop()
-    result = await loop.run_in_executor(
-        None,
-        partial(
-            subprocess.run,
-            [sys.executable, str(PREPROCESSOR)],
-            capture_output=True,
-            text=True,
-        ),
-    )
-    if result.returncode != 0:
-        raise RuntimeError(f"Preprocessor failed:\n{result.stderr}")
-    return BORDERS_SVG.read_text(encoding="utf-8")
-
-
-def require_bot_secret(x_bot_secret: str = Header(default="")):
-    if not BOT_SECRET:
-        raise HTTPException(status_code=500, detail="BOT_SECRET not configured on server")
-    if x_bot_secret != BOT_SECRET:
-        raise HTTPException(status_code=403, detail="Invalid bot secret")
-
-
-async def _do_place_city(discord_id: str, name: str, x: int, y: int) -> dict:
-    W, H = _map_size
-    if W > 0 and (x < 0 or x >= W or y < 0 or y >= H):
-        raise HTTPException(status_code=400, detail="Coordinates out of bounds")
-
-    if is_water(x, y):
-        raise HTTPException(status_code=400, detail="Cannot place a city on water")
-
-    conn = get_db()
-    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
-
-    cur.execute("SELECT id FROM cities WHERE owner_id = %s", (discord_id,))
-    if cur.fetchone():
-        cur.close()
-        conn.close()
-        raise HTTPException(status_code=400, detail="You already have a city")
-
-    city_id = name.lower().replace(" ", "-") + "-" + uuid.uuid4().hex[:6]
-
-    cur.execute(
-        "INSERT INTO cities (id, name, x, y, owner_id) VALUES (%s, %s, %s, %s, %s)",
-        (city_id, name, x, y, discord_id),
-    )
-
-    # Flush to cities.json so preprocessor sees it, but don't commit yet
-    cur.execute("SELECT id, name, x, y, owner_id FROM cities")
-    rows = cur.fetchall()
-    cities = [{"id": r["id"], "name": r["name"], "x": r["x"], "y": r["y"], "owner": r["owner_id"]} for r in rows]
-    CITIES_FILE.write_text(json.dumps(cities, indent=2), encoding="utf-8")
-
-    try:
-        svg = await run_preprocessor()
-    except RuntimeError as e:
-        conn.rollback()
-        cur.close()
-        conn.close()
-        db_to_cities_json()
-        raise HTTPException(status_code=500, detail=str(e))
-
-    conn.commit()
-    cur.close()
-    conn.close()
-
-    await manager.broadcast({"type": "borders_update", "svg": svg})
-
-    return {"id": city_id, "name": name, "x": x, "y": y, "owner": discord_id}
-
-# --------------------------------------------------------------------------- #
-# Bot endpoints
-# --------------------------------------------------------------------------- #
-class BotPlaceCityRequest(BaseModel):
-    discord_id: str
-    username:   str
-    avatar:     Optional[str] = None
-    name:       str
-    x:          int
-    y:          int
-
-
-@app.post("/bot/city")
-async def bot_place_city(
-    body: BotPlaceCityRequest,
-    x_bot_secret: str = Header(default=""),
-):
-    require_bot_secret(x_bot_secret)
-
-    conn = get_db()
-    cur = conn.cursor()
-    cur.execute(
-        "INSERT INTO players (discord_id, username, avatar) VALUES (%s, %s, %s)"
-        " ON CONFLICT (discord_id) DO UPDATE SET username=EXCLUDED.username, avatar=EXCLUDED.avatar",
-        (body.discord_id, body.username, body.avatar or ""),
-    )
-    conn.commit()
-    cur.close()
-    conn.close()
-
-    return await _do_place_city(body.discord_id, body.name, body.x, body.y)
-
-# --------------------------------------------------------------------------- #
-# Discord OAuth
-# --------------------------------------------------------------------------- #
+# ─── ENDPOINTS ───────────────────────────────────────────────────────────── #
 @app.get("/auth/discord")
 async def auth_discord(request: Request):
     return await oauth.discord.authorize_redirect(request, DISCORD_REDIRECT_URI)
 
-
 @app.get("/auth/callback")
 async def auth_callback(request: Request):
-    token = await oauth.discord.authorize_access_token(request)
-    async with httpx.AsyncClient() as client:
-        resp = await client.get(
-            "https://discord.com/api/users/@me",
-            headers={"Authorization": f"Bearer {token['access_token']}"},
-        )
-    user = resp.json()
-    discord_id = user["id"]
-    username   = user["username"]
-    avatar     = user.get("avatar", "")
+    try:
+        token = await oauth.discord.authorize_access_token(request)
+        async with httpx.AsyncClient() as client:
+            resp = await client.get("https://discord.com/api/users/@me", headers={"Authorization": f"Bearer {token['access_token']}"})
+            user = resp.json()
+        
+        db.execute("INSERT INTO players (discord_id, username, avatar) VALUES (%s, %s, %s) ON CONFLICT (discord_id) DO UPDATE SET username=EXCLUDED.username, avatar=EXCLUDED.avatar" if not db.is_sqlite else "INSERT OR REPLACE INTO players (discord_id, username, avatar) VALUES (?, ?, ?)", 
+                   (user["id"], user["username"], user.get("avatar", "")))
 
-    conn = get_db()
-    cur = conn.cursor()
-    cur.execute(
-        "INSERT INTO players (discord_id, username, avatar) VALUES (%s, %s, %s)"
-        " ON CONFLICT (discord_id) DO UPDATE SET username=EXCLUDED.username, avatar=EXCLUDED.avatar",
-        (discord_id, username, avatar),
-    )
-    conn.commit()
-    cur.close()
-    conn.close()
+        request.session.update({"discord_id": user["id"], "username": user["username"], "avatar": user.get("avatar", ""), "is_member": True})
+        
+        if BOT_TOKEN:
+            async with httpx.AsyncClient() as client:
+                m_resp = await client.get(f"https://discord.com/api/guilds/{GUILD_ID}/members/{user['id']}", headers={"Authorization": f"Bot {BOT_TOKEN}"})
+                request.session["is_member"] = (m_resp.status_code == 200)
 
-    request.session["discord_id"] = discord_id
-    request.session["username"]   = username
-    request.session["avatar"]     = avatar
-    return RedirectResponse("/")
+        return RedirectResponse(WEB_URL)
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"error": str(e)})
 
+@app.get("/auth/me")
+async def me(request: Request):
+    uid = request.session.get("discord_id")
+    if not uid: return {"authenticated": False}
+    cities = read_cities()
+    return {**request.session, "authenticated": True, "has_city": any(c.get("owner") == uid for c in cities), "debug_mode": DEBUG_MODE}
 
 @app.get("/auth/logout")
 async def logout(request: Request):
     request.session.clear()
-    return RedirectResponse("/")
+    return RedirectResponse(WEB_URL)
 
-
-@app.get("/auth/me")
-async def me(request: Request):
-    discord_id = request.session.get("discord_id")
-    if not discord_id:
-        return JSONResponse({"authenticated": False})
-    return JSONResponse({
-        "authenticated": True,
-        "discord_id": discord_id,
-        "username":   request.session.get("username"),
-        "avatar":     request.session.get("avatar"),
-    })
-
-# --------------------------------------------------------------------------- #
-# Cities
-# --------------------------------------------------------------------------- #
 @app.get("/cities")
 async def get_cities():
-    conn = get_db()
-    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
-    cur.execute(
-        "SELECT c.id, c.name, c.x, c.y, c.owner_id, p.username, p.avatar "
-        "FROM cities c JOIN players p ON c.owner_id = p.discord_id"
-    )
-    rows = cur.fetchall()
-    cur.close()
-    conn.close()
-    return [dict(r) for r in rows]
+    cities = read_cities()
+    players = {p["discord_id"]: p for p in db.execute("SELECT * FROM players", fetch=True)}
+    for c in cities:
+        if c.get("owner") in players:
+            c["username"] = players[c["owner"]]["username"]
+            c["avatar"] = players[c["owner"]]["avatar"]
+    return cities
 
-# --------------------------------------------------------------------------- #
-# WebSocket
-# --------------------------------------------------------------------------- #
+class PlaceCityRequest(BaseModel):
+    name: str
+    x: int
+    y: int
+    discord_id: Optional[str] = None
+    username: Optional[str] = None
+    avatar: Optional[str] = None
+
+async def handle_place_city(body: PlaceCityRequest, uid: str):
+    if is_water(body.x, body.y): raise HTTPException(status_code=400, detail="CANNOT PLACE ON WATER")
+    cities = read_cities()
+    if not DEBUG_MODE and any(c.get("owner") == uid for c in cities):
+        raise HTTPException(status_code=400, detail="YOU ALREADY HAVE A CITY")
+    
+    city_id = f"{body.name.lower().replace(' ', '-')}-{uuid.uuid4().hex[:6]}"
+    new_city = {"id": city_id, "name": body.name, "x": body.x, "y": body.y, "owner": uid}
+    cities.append(new_city)
+    write_cities(cities)
+    
+    svg = await update_borders()
+    await manager.broadcast({"type": "borders_update", "svg": svg})
+    return {"id": city_id}
+
+@app.post("/web/city")
+async def web_place_city(request: Request, body: PlaceCityRequest):
+    uid = request.session.get("discord_id")
+    if not uid: raise HTTPException(status_code=401, detail="Sign in first")
+    return await handle_place_city(body, uid)
+
+@app.post("/bot/city")
+async def bot_place_city(request: Request, body: PlaceCityRequest):
+    if request.headers.get("X-Bot-Secret") != BOT_SECRET:
+        raise HTTPException(status_code=401, detail="Invalid bot secret")
+    if not body.discord_id: raise HTTPException(status_code=400, detail="Missing discord_id")
+    
+    db.execute("INSERT INTO players (discord_id, username, avatar) VALUES (%s, %s, %s) ON CONFLICT (discord_id) DO UPDATE SET username=EXCLUDED.username, avatar=EXCLUDED.avatar" if not db.is_sqlite else "INSERT OR REPLACE INTO players (discord_id, username, avatar) VALUES (?, ?, ?)", 
+               (body.discord_id, body.username, body.avatar or ""))
+    
+    return await handle_place_city(body, body.discord_id)
+
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     await manager.connect(websocket)
-    if BORDERS_SVG.exists():
-        await websocket.send_json({
-            "type": "borders_update",
-            "svg":  BORDERS_SVG.read_text(encoding="utf-8"),
-        })
     try:
-        while True:
-            await websocket.receive_text()
-    except WebSocketDisconnect:
-        manager.disconnect(websocket)
+        if BORDERS_SVG.exists():
+            await websocket.send_json({"type": "borders_update", "svg": BORDERS_SVG.read_text(encoding="utf-8")})
+        while True: await websocket.receive_text()
+    except WebSocketDisconnect: manager.disconnect(websocket)
+    except: pass
 
-# --------------------------------------------------------------------------- #
-# Run
-# --------------------------------------------------------------------------- #
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("server:app", host="0.0.0.0", port=8000, reload=True)
+    # Initial border generation on startup
+    asyncio.run(update_borders())
+    uvicorn.run(app, host="0.0.0.0", port=8000)

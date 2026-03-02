@@ -11,654 +11,506 @@
   <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Barlow+Condensed:ital,wght@0,300;0,400;0,500;0,600;1,400&display=swap" rel="stylesheet" />
 
   <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    /* ── RESET & BASE ──────────────────────────────── */
+    *, *::before, *::after { 
+      box-sizing: border-box; 
+      margin: 0; padding: 0; 
+      user-select: none;
+      -webkit-user-select: none;
+      -webkit-user-drag: none;
+    }
+
+    input { 
+      user-select: text !important; 
+      -webkit-user-select: text !important; 
+    }
 
     :root {
       --red:         #C41E3A;
       --red-dark:    #8B1428;
-      --red-dim:     rgba(196,30,58,0.12);
+      --red-dim:     rgba(196,30,58,0.2);
       --gold:        #D4920A;
-      --gold-dim:    rgba(212,146,10,0.18);
       --bg:          #0D0D10;
       --surface:     #141418;
       --panel:       #18181D;
-      --panel-alt:   #1E1E24;
       --white:       #EDE8DC;
       --muted:       #7A7670;
       --dim:         #32302C;
-      --header-h:    56px;
+      --header-h:    64px;
     }
 
     html, body {
-      height: 100%;
-      overflow: hidden;
-      background: var(--bg);
-      color: var(--white);
+      height: 100%; overflow: hidden;
+      background: #000; color: var(--white);
       font-family: 'Barlow Condensed', sans-serif;
-    }
-
-    /* ── Grain overlay ─────────────────────────────── */
-    body::after {
-      content: '';
-      position: fixed;
-      inset: 0;
-      z-index: 9999;
-      pointer-events: none;
-      opacity: 0.028;
-      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-      background-size: 200px 200px;
     }
 
     /* ── HEADER ────────────────────────────────────── */
     .site-header {
-      position: fixed;
-      top: 0; left: 0; right: 0;
-      height: var(--header-h);
-      z-index: 100;
-      background: var(--bg);
-      border-bottom: 3px solid var(--red);
-      display: flex;
-      align-items: stretch;
+      position: fixed; top: 0; left: 0; right: 0; height: var(--header-h);
+      z-index: 1000; background: var(--bg); border-bottom: 3px solid var(--red);
+      display: grid; grid-template-columns: 1fr auto 1fr;
+      align-items: center; padding: 0 24px;
     }
 
-    .header-inner {
-      width: 100%;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 0 0 0 0;
+    .site-title { font-family: 'Oswald', sans-serif; font-size: 1.25rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; }
+
+    .mode-selector {
+      display: flex; gap: 4px; background: var(--surface);
+      padding: 4px; border: 1px solid var(--dim); border-radius: 4px;
+    }
+    .mode-btn {
+      padding: 6px 16px; font-size: 0.65rem; font-weight: 700;
+      text-transform: uppercase; color: var(--muted);
+      cursor: pointer; border: none; background: none; transition: all 0.2s;
+    }
+    .mode-btn.active { background: var(--red); color: white; }
+
+    .auth-button {
+      display: inline-flex; align-items: center; padding: 6px 16px;
+      border: 2px solid var(--dim); background: var(--surface);
+      font-size: 0.62rem; font-weight: 700; text-transform: uppercase;
+      color: var(--white); clip-path: polygon(8px 0%, 100% 0%, calc(100% - 8px) 100%, 0% 100%);
+      text-decoration: none; cursor: pointer;
     }
 
-    /* Left title block — slight diagonal cut on right edge */
-    .title-block {
-      display: flex;
-      align-items: center;
-      gap: 14px;
-      padding: 0 28px 0 20px;
-      background: var(--surface);
-      height: 100%;
-      clip-path: polygon(0 0, calc(100% - 16px) 0, 100% 100%, 0 100%);
-      border-right: none;
-    }
-
-    .header-star {
-      font-size: 1.5rem;
-      color: var(--red);
-      line-height: 1;
-      animation: star-pulse 4s ease-in-out infinite;
-      flex-shrink: 0;
-    }
-
-    @keyframes star-pulse {
-      0%, 100% { opacity: 1; }
-      50%       { opacity: 0.6; }
-    }
-
-    .title-text { display: flex; flex-direction: column; gap: 3px; }
-
-    .site-title {
-      font-family: 'Oswald', sans-serif;
-      font-size: 1.25rem;
-      font-weight: 700;
-      letter-spacing: 0.14em;
-      color: var(--white);
-      line-height: 1;
-      text-transform: uppercase;
-    }
-
-    .title-sub {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-
-    .title-rule {
-      width: 20px;
-      height: 2px;
-      background: var(--red);
-      flex-shrink: 0;
-    }
-
-    .site-subtitle {
-      font-family: 'Barlow Condensed', sans-serif;
-      font-size: 0.6rem;
-      font-weight: 500;
-      letter-spacing: 0.3em;
-      text-transform: uppercase;
-      color: var(--muted);
-    }
-
-    /* Right side */
-    .header-right {
-      display: flex;
-      align-items: center;
-      gap: 14px;
-      padding-right: 20px;
-    }
-
-    .player-count {
-      font-family: 'Oswald', sans-serif;
-      font-size: 0.75rem;
-      font-weight: 600;
-      letter-spacing: 0.18em;
-      text-transform: uppercase;
-      color: var(--muted);
-    }
-
-    .player-count span {
-      color: var(--red);
-      font-size: 0.9rem;
-    }
-
-    .discord-pill {
-      display: flex;
-      align-items: center;
-      gap: 7px;
-      padding: 5px 14px;
-      border: 2px solid var(--dim);
-      background: var(--surface);
-      font-family: 'Barlow Condensed', sans-serif;
-      font-size: 0.62rem;
-      font-weight: 600;
-      letter-spacing: 0.22em;
-      text-transform: uppercase;
-      color: var(--muted);
-      clip-path: polygon(8px 0%, 100% 0%, calc(100% - 8px) 100%, 0% 100%);
-    }
-
-    .pill-star {
-      color: var(--red);
-      font-size: 0.7rem;
-      flex-shrink: 0;
-    }
-
-    /* ── MAP ──────────────────────────────────────── */
+    /* ── MAP ───────────────────────────────────────── */
     .map-wrapper {
-      position: fixed;
-      top: var(--header-h);
-      left: 0; right: 0; bottom: 0;
-      overflow: hidden;
-    }
-
-    .map-container {
-      position: relative;
-      width: 100%;
-      height: 100%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      background: #080809;
-      cursor: crosshair;
-    }
-
-    .base-map {
-      display: block;
-      max-width: 100%;
-      max-height: 100%;
-      object-fit: contain;
-      user-select: none;
-      -webkit-user-drag: none;
-      position: relative;
+      position: fixed; top: var(--header-h); left: 0; right: 0; bottom: 0;
+      overflow: hidden; background: #000;
       z-index: 1;
     }
 
-    .borders-layer {
-      position: absolute;
-      z-index: 2;
+    .map-container, .map-transform-layer, .map-wrap-layer { 
+      width: 100%; height: 100%; 
+      position: relative; 
       pointer-events: none;
     }
+    
+    .map-transform-layer { position: absolute; left: 0; top: 0; will-change: transform; transform-origin: 0 0; }
+    .map-wrap-layer { display: flex; flex-direction: row; }
+    .map-instance { flex-shrink: 0; position: relative; pointer-events: auto; }
 
-    .borders-layer svg {
-      width: 100%;
-      height: 100%;
-      pointer-events: all;
+    .base-map-img { display: block; max-width: none; max-height: none; cursor: crosshair; pointer-events: auto; }
+
+    .borders-layer, .cities-layer { 
+      position: absolute; inset: 0; 
+      width: 100%; height: 100%;
+      pointer-events: none;
     }
+    .borders-layer { z-index: 10; }
+    .cities-layer { z-index: 5; }
 
+    .borders-layer svg { width: 100%; height: 100%; display: block; pointer-events: none; }
     .borders-layer path {
-      stroke: rgba(237,232,220,0.4);
+      pointer-events: auto;
+      cursor: pointer;
+      fill: rgba(255, 255, 255, 0); 
+      stroke: var(--red);
       stroke-width: 1.5;
-      cursor: pointer;
-      transition: filter 0.1s, opacity 0.1s;
-      opacity: 0.82;
+      opacity: 0.5;
+      transition: all 0.2s;
     }
-
     .borders-layer path:hover {
-      filter: brightness(1.6) saturate(1.2);
       opacity: 1;
+      fill: rgba(196, 30, 58, 0.2);
+      stroke: var(--gold);
+      stroke-width: 3;
     }
-
     .borders-layer path.selected {
-      filter: brightness(1.9) saturate(1.3);
       opacity: 1;
-      stroke: var(--white);
-      stroke-width: 2.5;
+      fill: rgba(196, 30, 58, 0.4);
+      stroke: #fff;
+      stroke-width: 4;
     }
 
-    /* Hard vignette — corners only */
-    .map-vignette {
-      position: absolute;
-      inset: 0;
-      z-index: 3;
-      pointer-events: none;
-      background:
-        radial-gradient(ellipse 90% 88% at 50% 50%,
-          transparent 52%,
-          rgba(13,13,16,0.6) 80%,
-          rgba(13,13,16,0.92) 100%);
-    }
-
-    /* ── EMPTY STATE ────────────────────────────── */
-    .empty-state {
-      position: absolute;
-      top: 50%; left: 50%;
+    .city-marker {
+      position: absolute; 
+      width: 14px; height: 14px; 
+      background: white;
+      border: 3px solid var(--red); 
       transform: translate(-50%, -50%);
-      z-index: 10;
-      text-align: center;
+      box-shadow: 0 0 15px rgba(196,30,58,0.8); 
       pointer-events: none;
-      display: none;
-    }
-
-    .empty-state.visible { display: block; }
-
-    .empty-inner {
-      position: relative;
-      padding: 40px 52px;
-      background: var(--panel);
-      border-top: 3px solid var(--red);
-      border-bottom: 3px solid var(--red);
-    }
-
-    /* Diagonal stripe accents — left/right edges */
-    .empty-inner::before,
-    .empty-inner::after {
-      content: '';
-      position: absolute;
-      top: 0; bottom: 0;
-      width: 6px;
-      background-image: repeating-linear-gradient(
-        -45deg,
-        var(--red) 0px,
-        var(--red) 3px,
-        transparent 3px,
-        transparent 9px
-      );
-      opacity: 0.6;
-    }
-    .empty-inner::before { left: 0; }
-    .empty-inner::after  { right: 0; }
-
-    .empty-star {
-      font-size: 2.2rem;
-      color: var(--red);
-      line-height: 1;
-      margin-bottom: 14px;
-      animation: star-pulse 2.5s ease-in-out infinite;
-    }
-
-    .empty-title {
-      font-family: 'Oswald', sans-serif;
-      font-weight: 700;
-      font-size: clamp(1.6rem, 4vw, 3rem);
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      color: var(--white);
-      line-height: 1.05;
-      margin-bottom: 16px;
-    }
-
-    .empty-sub {
-      font-family: 'Barlow Condensed', sans-serif;
-      font-size: 0.75rem;
-      font-weight: 500;
-      letter-spacing: 0.32em;
-      text-transform: uppercase;
-      color: var(--red);
-    }
-
-    /* ── COORD READOUT ──────────────────────────── */
-    .coord-readout {
-      position: fixed;
-      bottom: 20px;
-      left: 20px;
       z-index: 20;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      background: var(--panel);
-      border-left: 3px solid var(--red);
-      padding: 6px 14px 6px 12px;
-      pointer-events: none;
-      opacity: 0;
-      transition: opacity 0.15s;
     }
 
-    .coord-readout.visible { opacity: 1; }
-
-    .coord-label {
-      font-family: 'Oswald', sans-serif;
-      font-size: 0.6rem;
-      font-weight: 600;
-      letter-spacing: 0.2em;
-      color: var(--red);
+    /* ── UI PANELS ───────────────────────────────── */
+    .zoom-controls {
+      position: fixed; bottom: 24px; right: 24px;
+      z-index: 1100; display: flex; flex-direction: column; gap: 8px;
+    }
+    .zoom-btn {
+      width: 48px; height: 48px; background: var(--panel);
+      border: 2px solid var(--dim); color: var(--white);
+      font-family: 'Oswald', sans-serif; font-size: 1.5rem;
+      cursor: pointer; display: flex; align-items: center; justify-content: center;
     }
 
-    .coord-val {
-      font-family: 'Barlow Condensed', sans-serif;
-      font-size: 0.8rem;
-      font-weight: 500;
-      letter-spacing: 0.1em;
+    .interaction-card {
+      position: fixed; bottom: 24px; left: 24px; 
+      width: 340px;
+      z-index: 1050; background: var(--panel); border: 2px solid var(--red);
+      opacity: 0; transform: translateY(20px); pointer-events: none;
+      transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+      padding: 32px 24px;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.8);
+      text-align: center;
+    }
+    .interaction-card.visible { opacity: 1; transform: translateY(0); pointer-events: all; }
+    
+    #city-input {
+      width: 70%; 
+      margin: 20px auto;
+      display: block;
+      padding: 14px;
+      background: #000;
       color: var(--white);
-      min-width: 40px;
+      border: 2px solid var(--red);
+      font-family: 'Oswald', sans-serif;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      outline: none;
+      box-shadow: inset 0 0 10px rgba(196, 30, 58, 0.3);
+      transition: border-color 0.2s, box-shadow 0.2s;
+      text-align: center;
     }
+    #city-input:focus { border-color: var(--gold); box-shadow: 0 0 20px rgba(212, 146, 10, 0.3); }
 
-    .coord-sep {
-      color: var(--dim);
-      font-size: 1rem;
-    }
-
-    /* ── INFO PANEL ─────────────────────────────── */
     .info-panel {
-      position: fixed;
-      top: var(--header-h);
-      right: 0; bottom: 0;
-      width: 280px;
-      z-index: 50;
-      background: var(--panel);
-      border-left: 4px solid var(--red);
-      transform: translateX(100%);
-      transition: transform 0.25s cubic-bezier(0.4,0,0.2,1);
-      display: flex;
-      flex-direction: column;
-      overflow: hidden;
+      position: fixed; top: var(--header-h); right: 0; bottom: 0; width: 360px;
+      z-index: 1200; background: var(--panel); border-left: 4px solid var(--red);
+      transform: translateX(100%); transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+      box-shadow: -20px 0 50px rgba(0,0,0,0.7);
     }
-
     .info-panel.open { transform: translateX(0); }
+    .panel-content { padding: 40px; }
 
-    /* Top stripe accent bar */
-    .panel-stripe {
-      height: 4px;
-      flex-shrink: 0;
-      background-image: repeating-linear-gradient(
-        90deg,
-        var(--red) 0px,
-        var(--red) 8px,
-        var(--bg) 8px,
-        var(--bg) 14px
-      );
+    .coord-readout {
+      position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); 
+      z-index: 100; background: var(--panel); border: 1px solid var(--dim);
+      border-bottom: 3px solid var(--red);
+      padding: 10px 24px; opacity: 0; transition: opacity 0.3s; pointer-events: none;
+      font-family: 'Oswald'; letter-spacing: 0.1em; font-size: 0.9rem;
+      display: flex; gap: 16px; align-items: center;
+      min-width: 300px; justify-content: center;
     }
-
-    .panel-content {
-      padding: 18px 20px;
-      flex: 1;
-      overflow-y: auto;
-      scrollbar-width: thin;
-      scrollbar-color: var(--red-dark) transparent;
-    }
-
-    .panel-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      margin-bottom: 12px;
-    }
-
-    .panel-kicker {
-      font-family: 'Barlow Condensed', sans-serif;
-      font-size: 0.58rem;
-      font-weight: 600;
-      letter-spacing: 0.32em;
-      text-transform: uppercase;
-      color: var(--red);
-    }
-
-    .panel-close {
-      background: none;
-      border: 2px solid var(--dim);
-      color: var(--muted);
-      width: 22px; height: 22px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      cursor: pointer;
-      font-size: 11px;
-      font-family: 'Barlow Condensed', sans-serif;
-      transition: border-color 0.15s, color 0.15s;
-      flex-shrink: 0;
-    }
-
-    .panel-close:hover {
-      border-color: var(--red);
-      color: var(--red);
-    }
-
-    .panel-city-name {
-      font-family: 'Oswald', sans-serif;
-      font-size: 1.6rem;
-      font-weight: 700;
-      letter-spacing: 0.06em;
-      text-transform: uppercase;
-      color: var(--white);
-      line-height: 1.1;
-      margin-bottom: 18px;
-      word-break: break-word;
-    }
-
-    .panel-divider {
-      height: 2px;
-      background: var(--surface);
-      border-top: 1px solid var(--dim);
-      margin-bottom: 18px;
-    }
-
-    .data-row {
-      margin-bottom: 16px;
-    }
-
-    .data-label {
-      display: block;
-      font-family: 'Barlow Condensed', sans-serif;
-      font-size: 0.55rem;
-      font-weight: 600;
-      letter-spacing: 0.32em;
-      text-transform: uppercase;
-      color: var(--red);
-      margin-bottom: 5px;
-    }
-
-    .data-value {
-      font-family: 'Oswald', sans-serif;
-      font-size: 0.88rem;
-      font-weight: 400;
-      letter-spacing: 0.08em;
-      color: var(--white);
-    }
-
-    .commander-info {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-
-    .panel-avatar {
-      width: 34px; height: 34px;
-      border-radius: 0;
-      border: 2px solid var(--red-dark);
-      object-fit: cover;
-      flex-shrink: 0;
-    }
-
-    .panel-avatar-placeholder {
-      width: 34px; height: 34px;
-      border: 2px solid var(--dim);
-      background: var(--panel-alt);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: var(--red);
-      font-size: 14px;
-      flex-shrink: 0;
-    }
-
-    /* Discord deploy hint */
-    .discord-hint {
-      margin-top: 4px;
-      padding: 12px;
-      background: var(--panel-alt);
-      border-left: 3px solid var(--gold);
-    }
-
-    .discord-hint .data-label {
-      color: var(--gold);
-      margin-bottom: 7px;
-    }
-
-    .discord-hint code {
-      display: block;
-      font-family: 'Barlow Condensed', sans-serif;
-      font-style: normal;
-      font-size: 0.72rem;
-      font-weight: 500;
-      letter-spacing: 0.04em;
-      color: var(--white);
-      word-break: break-all;
-      line-height: 1.5;
-    }
-
-    /* ── SCROLLBAR ──────────────────────────────── */
-    ::-webkit-scrollbar { width: 3px; }
-    ::-webkit-scrollbar-track { background: transparent; }
-    ::-webkit-scrollbar-thumb { background: var(--red-dark); }
+    .coord-readout.visible { opacity: 1; }
+    .hover-info { color: var(--gold); border-left: 1px solid var(--dim); padding-left: 16px; font-weight: 600; text-transform: uppercase; }
   </style>
 </head>
 <body>
 
-<!-- ── HEADER ──────────────────────────────────── -->
 <header class="site-header">
-  <div class="header-inner">
-    <div class="title-block">
-      <span class="header-star" aria-hidden="true">★</span>
-      <div class="title-text">
-        <h1 class="site-title">Shapes &amp; States</h1>
-        <div class="title-sub">
-          <span class="title-rule"></span>
-          <span class="site-subtitle">Territorial Claims</span>
-        </div>
-      </div>
-    </div>
-    <div class="header-right">
-      <div class="player-count" id="player-count"></div>
-      <div class="discord-pill">
-        <span class="pill-star" aria-hidden="true">★</span>
-        Use /place-city in Discord
-      </div>
-    </div>
+  <div class="title-block" style="display:flex; align-items:center; gap:12px;">
+    <span style="color:var(--red); font-size:1.5rem;">★</span>
+    <h1 class="site-title">Shapes & States</h1>
+  </div>
+  <div class="mode-selector">
+    <button class="mode-btn active" data-mode="view">View</button>
+    <button class="mode-btn" data-mode="interact">Interact</button>
+  </div>
+  <div class="header-right" id="auth-section">
+    <a href="http://localhost:8000/auth/discord" class="auth-button" id="login-link">Sign in</a>
   </div>
 </header>
 
-<!-- ── MAP ─────────────────────────────────────── -->
-<main class="map-wrapper">
+<main class="map-wrapper" id="map-wrapper">
   <div class="map-container" id="map-container">
-    <img
-      class="base-map"
-      id="base-map"
-      src="https://shapes-and-states-production.up.railway.app/static/base_map.png"
-      alt="World Map"
-      draggable="false"
-    />
-    <div class="borders-layer" id="borders-layer"></div>
-    <div class="map-vignette"></div>
-    <div class="empty-state" id="empty-state">
-      <div class="empty-inner">
-        <div class="empty-star" aria-hidden="true">★</div>
-        <h2 class="empty-title">Be the first<br>to claim land</h2>
-        <p class="empty-sub">Type /place-city in Discord</p>
+    <div class="map-transform-layer" id="map-transform">
+      <div class="map-wrap-layer" id="map-wrap">
+        <div class="map-instance"><img class="base-map-img" /><div class="borders-layer"></div><div class="cities-layer"></div></div>
+        <div class="map-instance"><img class="base-map-img" /><div class="borders-layer"></div><div class="cities-layer"></div></div>
+        <div class="map-instance"><img class="base-map-img" /><div class="borders-layer"></div><div class="cities-layer"></div></div>
       </div>
     </div>
   </div>
 </main>
 
-<!-- ── COORD READOUT ───────────────────────────── -->
-<div class="coord-readout" id="coord-readout" aria-hidden="true">
-  <span class="coord-label">X</span>
-  <span class="coord-val" id="coord-x">—</span>
-  <span class="coord-sep">·</span>
-  <span class="coord-label">Y</span>
-  <span class="coord-val" id="coord-y">—</span>
+<aside class="interaction-card" id="ui-card">
+  <div id="ui-card-content">Select a location.</div>
+</aside>
+
+<div class="coord-readout" id="coord-display">
+  <div>GRID: <span id="coord-x">—</span>, <span id="coord-y">—</span></div>
+  <div class="hover-info" id="hover-info" style="display:none;">OWNER: <span id="hover-owner">—</span></div>
 </div>
 
-<!-- ── INFO PANEL ──────────────────────────────── -->
 <aside class="info-panel" id="info-panel">
-  <div class="panel-stripe"></div>
   <div class="panel-content">
-    <div class="panel-header">
-      <span class="panel-kicker">Province Intel</span>
-      <button class="panel-close" id="panel-close" aria-label="Close">✕</button>
-    </div>
-    <div class="panel-city-name" id="panel-city-name">—</div>
-    <div class="panel-divider"></div>
-    <div class="data-row">
-      <span class="data-label">Commander</span>
-      <div class="commander-info">
-        <div id="panel-avatar-wrap" class="panel-avatar-placeholder">★</div>
-        <span id="panel-owner-name" class="data-value">—</span>
+    <div style="display:flex; justify-content:space-between; margin-bottom:40px; align-items:flex-start;">
+      <div>
+        <small style="color:var(--muted); text-transform:uppercase; font-weight:700; font-size:0.65rem; letter-spacing:0.15em;">Settlement Report</small>
+        <h2 id="info-city-name" style="font-family:'Oswald'; color:var(--red); text-transform:uppercase; letter-spacing:0.05em; font-size:2rem; line-height:1.1;">—</h2>
       </div>
+      <button id="info-close" style="background:none; border:none; color:var(--muted); cursor:pointer; font-size:1.5rem; padding:5px;">✕</button>
     </div>
-    <div class="data-row">
-      <span class="data-label">Grid Ref</span>
-      <span class="data-value" id="panel-coords">—</span>
-    </div>
-    <div class="discord-hint" id="discord-hint" style="display:none">
-      <span class="data-label">Deploy Nearby</span>
-      <code id="discord-hint-cmd">/place-city name:... x:... y:...</code>
+    <div id="info-data">
+      <div style="margin-bottom:32px;">
+        <small style="color:var(--muted); text-transform:uppercase; font-weight:700; font-size:0.65rem; letter-spacing:0.1em;">Governed By</small>
+        <div id="info-owner-name" style="font-size:1.6rem; color:var(--white); font-family:'Oswald'; margin-top:4px;">—</div>
+      </div>
+      <div>
+        <small style="color:var(--muted); text-transform:uppercase; font-weight:700; font-size:0.65rem; letter-spacing:0.1em;">Strategic Coordinates</small>
+        <div id="info-coords" style="font-size:1.4rem; color:var(--gold); font-family:'Oswald'; margin-top:4px;">—</div>
+      </div>
     </div>
   </div>
 </aside>
 
+<div class="zoom-controls">
+  <button class="zoom-btn" data-zoom="in">+</button>
+  <button class="zoom-btn" data-zoom="out">−</button>
+</div>
+
 <script is:inline>
-(function () {
-  const API    = 'https://shapes-and-states-production.up.railway.app';
-  const WS_URL = 'wss://shapes-and-states-production.up.railway.app/ws';
+(function() {
+  const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+  const API = isLocal ? 'http://localhost:8000' : 'https://shapes-and-states-production.up.railway.app';
+  const WS_URL = isLocal ? 'ws://localhost:8000/ws' : 'wss://shapes-and-states-production.up.railway.app/ws';
 
-  const state = { cities: [], selectedPath: null };
+  const state = {
+    cities: [], user: null, mode: 'view', bordersSvg: '',
+    target: { zoom: 1, panX: 0, panY: 0 },
+    current: { zoom: 1, panX: 0, panY: 0 },
+    mouse: { x: window.innerWidth/2, y: window.innerHeight/2 },
+    isReady: false, mapWidth: 0, mapHeight: 0
+  };
 
-  const mapContainer    = document.getElementById('map-container');
-  const baseMap         = document.getElementById('base-map');
-  const bordersLayer    = document.getElementById('borders-layer');
-  const emptyState      = document.getElementById('empty-state');
-  const coordReadout    = document.getElementById('coord-readout');
-  const coordX          = document.getElementById('coord-x');
-  const coordY          = document.getElementById('coord-y');
-  const playerCount     = document.getElementById('player-count');
-  const infoPanel       = document.getElementById('info-panel');
-  const panelCityName   = document.getElementById('panel-city-name');
-  const panelOwnerName  = document.getElementById('panel-owner-name');
-  const panelAvatarWrap = document.getElementById('panel-avatar-wrap');
-  const panelCoords     = document.getElementById('panel-coords');
-  const panelClose      = document.getElementById('panel-close');
-  const discordHint     = document.getElementById('discord-hint');
-  const discordHintCmd  = document.getElementById('discord-hint-cmd');
+  const ui = {
+    wrapper: document.getElementById('map-wrapper'),
+    container: document.getElementById('map-container'),
+    transform: document.getElementById('map-transform'),
+    wrap: document.getElementById('map-wrap'),
+    auth: document.getElementById('auth-section'),
+    card: document.getElementById('ui-card'),
+    cardContent: document.getElementById('ui-card-content'),
+    info: document.getElementById('info-panel'),
+    coords: document.getElementById('coord-display'),
+    hoverInfo: document.getElementById('hover-info'),
+    hoverOwner: document.getElementById('hover-owner')
+  };
 
-  async function init() { await Promise.all([fetchCities(), loadBorders()]); connectWS(); }
-  async function fetchCities() { try { const r = await fetch(`${API}/cities`); state.cities = await r.json(); updatePlayerCount(); } catch { state.cities = []; } }
-  function updatePlayerCount() { const n = state.cities.length; playerCount.innerHTML = n === 0 ? '' : `<span>${n}</span> ${n === 1 ? 'CITY' : 'CITIES'} FOUNDED`; }
-  function syncBordersLayer() { if (!baseMap.naturalWidth) return; const imgRect = baseMap.getBoundingClientRect(); const wrapRect = mapContainer.getBoundingClientRect(); bordersLayer.style.left = (imgRect.left - wrapRect.left) + 'px'; bordersLayer.style.top = (imgRect.top - wrapRect.top) + 'px'; bordersLayer.style.width = imgRect.width + 'px'; bordersLayer.style.height = imgRect.height + 'px'; }
-  baseMap.addEventListener('load', syncBordersLayer); window.addEventListener('resize', syncBordersLayer); if (baseMap.complete) syncBordersLayer();
-  async function loadBorders() { try { const r = await fetch(`${API}/static/data/borders.svg`, { cache: 'no-store' }); if (!r.ok) { checkEmptyState(); return; } injectSVG(await r.text()); } catch { checkEmptyState(); } }
-  function injectSVG(svgText) { const parser = new DOMParser(); const doc = parser.parseFromString(svgText, 'image/svg+xml'); const svg = doc.querySelector('svg'); if (!svg) { checkEmptyState(); return; } svg.setAttribute('width', '100%'); svg.setAttribute('height', '100%'); svg.style.cssText = 'position:absolute;top:0;left:0;'; bordersLayer.innerHTML = svg.outerHTML; syncBordersLayer(); bindProvinceEvents(); checkEmptyState(); }
-  function checkEmptyState() { emptyState.classList.toggle('visible', bordersLayer.querySelectorAll('path').length === 0); }
-  function bindProvinceEvents() { bordersLayer.querySelectorAll('path').forEach(path => { path.setAttribute('pointer-events', 'all'); path.addEventListener('click', onProvinceClick); }); }
-  function onProvinceClick(e) { e.stopPropagation(); const path = e.currentTarget; const cityId = path.getAttribute('id'); const city = state.cities.find(c => c.id === cityId); if (state.selectedPath) state.selectedPath.classList.remove('selected'); path.classList.add('selected'); state.selectedPath = path; showInfoPanel(city, cityId, path.getAttribute('data-owner')); }
-  function showInfoPanel(city, cityId, ownerId) { if (city) { panelCityName.textContent = city.name || cityId; panelOwnerName.textContent = city.username || ownerId || 'Unknown'; panelCoords.textContent = `${city.x}, ${city.y}`; if (city.avatar && city.owner_id) { panelAvatarWrap.innerHTML = `<img class="panel-avatar" src="https://cdn.discordapp.com/avatars/${city.owner_id}/${city.avatar}.png?size=64" alt="${city.username}" />`; panelAvatarWrap.className = ''; } else { panelAvatarWrap.innerHTML = '★'; panelAvatarWrap.className = 'panel-avatar-placeholder'; } discordHintCmd.textContent = `/place-city name:YourCity x:${city.x} y:${city.y}`; discordHint.style.display = ''; } else { panelCityName.textContent = cityId || '—'; panelOwnerName.textContent = ownerId || 'Unknown'; panelAvatarWrap.innerHTML = '★'; panelAvatarWrap.className = 'panel-avatar-placeholder'; panelCoords.textContent = '—'; discordHint.style.display = 'none'; } infoPanel.classList.add('open'); }
-  panelClose.addEventListener('click', closeInfoPanel);
-  function closeInfoPanel() { infoPanel.classList.remove('open'); if (state.selectedPath) { state.selectedPath.classList.remove('selected'); state.selectedPath = null; } }
-  mapContainer.addEventListener('click', e => { if (!e.target.closest('path')) closeInfoPanel(); });
-  mapContainer.addEventListener('mousemove', e => { const coords = getMapCoords(e); if (coords) { coordX.textContent = coords.x; coordY.textContent = coords.y; coordReadout.classList.add('visible'); } else { coordReadout.classList.remove('visible'); } });
-  mapContainer.addEventListener('mouseleave', () => { coordReadout.classList.remove('visible'); });
-  function getMapCoords(e) { const rect = baseMap.getBoundingClientRect(); if (e.clientX < rect.left || e.clientX > rect.right || e.clientY < rect.top || e.clientY > rect.bottom) return null; const scaleX = baseMap.naturalWidth / rect.width; const scaleY = baseMap.naturalHeight / rect.height; return { x: Math.round((e.clientX - rect.left) * scaleX), y: Math.round((e.clientY - rect.top) * scaleY) }; }
-  function connectWS() { let retryDelay = 2000; function open() { const ws = new WebSocket(WS_URL); ws.onopen = () => { retryDelay = 2000; }; ws.onmessage = e => { try { const data = JSON.parse(e.data); if (data.type === 'borders_update') { injectSVG(data.svg); fetchCities().then(updatePlayerCount); } } catch {} }; ws.onclose = () => { setTimeout(open, retryDelay); retryDelay = Math.min(retryDelay * 1.5, 30000); }; } open(); }
+  async function init() {
+    const firstImg = document.querySelector('.base-map-img');
+    firstImg.src = `${API}/static/base_map.png`;
+    await fetchAuth();
+    await Promise.all([fetchCities(), loadBorders()]);
+    if (firstImg.complete) onReady(); else firstImg.onload = onReady;
+    setupEvents(); connectWS();
+    requestAnimationFrame(renderLoop);
+  }
+
+  function onReady() {
+    if (state.isReady) return;
+    const firstImg = document.querySelector('.base-map-img');
+    state.mapWidth = firstImg.naturalWidth;
+    state.mapHeight = firstImg.naturalHeight;
+    document.querySelectorAll('.base-map-img').forEach(img => img.src = `${API}/static/base_map.png`);
+    document.querySelectorAll('.map-instance').forEach(el => { 
+      el.style.width = state.mapWidth + 'px'; el.style.height = state.mapHeight + 'px'; 
+    });
+    const vW = window.innerWidth; const vH = ui.wrapper.clientHeight;
+    state.target.panX = (vW / 2) - state.mapWidth; 
+    state.target.panY = (vH / 2) - (state.mapHeight / 2);
+    state.current.panX = state.target.panX; state.current.panY = state.target.panY;
+    state.isReady = true; renderBorders(); renderCities();
+  }
+
+  async function fetchAuth() {
+    try {
+      const r = await fetch(`${API}/auth/me`, { credentials: 'include' });
+      const d = await r.json();
+      if (d.authenticated) {
+        state.user = d;
+        ui.auth.innerHTML = `<span>${d.username}</span> <a href="${API}/auth/logout" class="auth-button" style="margin-left:15px;">Logout</a>`;
+      }
+    } catch(e) {}
+  }
+
+  async function fetchCities() {
+    try {
+      const r = await fetch(`${API}/cities`);
+      state.cities = await r.json();
+      renderCities();
+    } catch(e) {}
+  }
+
+  async function loadBorders() {
+    try {
+      const r = await fetch(`${API}/data/borders.svg`);
+      if (r.ok) { state.bordersSvg = await r.text(); renderBorders(); }
+    } catch(e) {}
+  }
+
+  function renderLoop() {
+    if (state.mapWidth > 0) {
+      const lerp = 0.15; const margin = 100; const speed = 20;
+      if (state.mouse.x < margin) state.target.panX += ((margin - state.mouse.x) / margin) * speed;
+      else if (state.mouse.x > window.innerWidth - margin) state.target.panX -= ((state.mouse.x - (window.innerWidth - margin)) / margin) * speed;
+      if (state.mouse.y < margin + 64) state.target.panY += ((margin + 64 - state.mouse.y) / margin) * speed;
+      else if (state.mouse.y > window.innerHeight - margin) state.target.panY -= ((state.mouse.y - (window.innerHeight - margin)) / margin) * speed;
+
+      const wrapW = state.mapWidth * state.target.zoom;
+      if (state.target.panX > 0) { state.target.panX -= wrapW; state.current.panX -= wrapW; }
+      if (state.target.panX < -wrapW * 2) { state.target.panX += wrapW; state.current.panX += wrapW; }
+
+      const vH = ui.wrapper.clientHeight;
+      const scaledH = state.mapHeight * state.target.zoom;
+      if (scaledH > vH) state.target.panY = Math.min(Math.max(state.target.panY, vH - scaledH), 0);
+      else state.target.panY = (vH - scaledH) / 2;
+
+      state.current.zoom += (state.target.zoom - state.current.zoom) * lerp;
+      state.current.panX += (state.target.panX - state.current.panX) * lerp;
+      state.current.panY += (state.target.panY - state.current.panY) * lerp;
+      ui.transform.style.transform = `translate(${state.current.panX}px, ${state.current.panY}px) scale(${state.current.zoom})`;
+    }
+    requestAnimationFrame(renderLoop);
+  }
+
+  function renderBorders() {
+    if (!state.bordersSvg || !state.isReady) return;
+    document.querySelectorAll('.borders-layer').forEach(layer => { layer.innerHTML = state.bordersSvg; });
+  }
+
+  function renderCities() {
+    if (!state.mapWidth || !state.isReady) return;
+    document.querySelectorAll('.cities-layer').forEach(layer => {
+      layer.innerHTML = '';
+      state.cities.forEach(c => {
+        const m = document.createElement('div'); m.className = 'city-marker';
+        m.style.left = `${(c.x / state.mapWidth) * 100}%`; m.style.top = `${(c.y / state.mapHeight) * 100}%`;
+        layer.appendChild(m);
+      });
+    });
+  }
+
+  function getCoords(e) {
+    if (!state.isReady) return null;
+    const instance = e.target.closest('.map-instance');
+    if (!instance) return null;
+    const rect = instance.getBoundingClientRect();
+    let x = (e.clientX - rect.left) * (state.mapWidth / rect.width);
+    let y = (e.clientY - rect.top) * (state.mapHeight / rect.height);
+    x = ((x % state.mapWidth) + state.mapWidth) % state.mapWidth;
+    if (y < 0 || y > state.mapHeight) return null;
+    return { x: Math.round(x), y: Math.round(y) };
+  }
+
+  function setupEvents() {
+    window.addEventListener('mousemove', (e) => {
+      state.mouse.x = e.clientX; state.mouse.y = e.clientY;
+      const c = getCoords(e);
+      const path = e.target.closest('path');
+      if (path) {
+        const city = state.cities.find(city => city.id === path.id);
+        ui.hoverOwner.textContent = city ? (city.username || 'Citizen') : 'Neutral';
+        ui.hoverInfo.style.display = 'block';
+      } else {
+        ui.hoverInfo.style.display = 'none';
+      }
+      if (c) {
+        document.getElementById('coord-x').textContent = c.x;
+        document.getElementById('coord-y').textContent = c.y;
+        ui.coords.classList.add('visible');
+      } else ui.coords.classList.remove('visible');
+    });
+
+    ui.wrapper.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      const delta = e.deltaY > 0 ? 0.85 : 1.15;
+      const oldZ = state.target.zoom;
+      state.target.zoom = Math.min(Math.max(state.target.zoom * delta, 0.4), 10);
+      const rect = ui.wrapper.getBoundingClientRect();
+      const mx = e.clientX - rect.left; const my = e.clientY - rect.top;
+      state.target.panX = mx - (mx - state.target.panX) * (state.target.zoom / oldZ);
+      state.target.panY = my - (my - state.target.panY) * (state.target.zoom / oldZ);
+    }, { passive: false });
+
+    ui.wrapper.addEventListener('click', (e) => {
+      const path = e.target.closest('path');
+      if (path) {
+        e.stopPropagation();
+        const city = state.cities.find(c => c.id === path.id);
+        document.querySelectorAll('path.selected').forEach(p => p.classList.remove('selected'));
+        document.querySelectorAll(`.borders-layer path[id="${path.id}"]`).forEach(p => p.classList.add('selected'));
+        document.getElementById('info-city-name').textContent = city ? city.name : path.id;
+        document.getElementById('info-owner-name').textContent = city ? (city.username || 'Citizen') : 'Neutral Territory';
+        document.getElementById('info-coords').textContent = city ? `${city.x}, ${city.y}` : 'Unmapped';
+        ui.info.classList.add('open'); ui.card.classList.remove('visible');
+        return;
+      }
+
+      if (e.target.closest('.base-map-img')) {
+        ui.info.classList.remove('open');
+        document.querySelectorAll('path.selected').forEach(p => p.classList.remove('selected'));
+        if (state.mode === 'interact') {
+          const c = getCoords(e); if (!c) return;
+          ui.card.classList.add('visible');
+          if (!state.user) {
+            ui.cardContent.innerHTML = `<p style='color:var(--muted);'>LOGIN REQUIRED</p>`;
+          } else if (state.user.has_city && !state.user.debug_mode) {
+            ui.cardContent.innerHTML = `<p style='color:var(--red);'>LIMIT REACHED</p>`;
+          } else {
+            ui.cardContent.innerHTML = `
+              <h3 style='font-family:Oswald; color:var(--red); margin-bottom:12px;'>ESTABLISH SETTLEMENT</h3>
+              <p style='color:var(--gold); margin-bottom:16px; font-size:0.85rem;'>COORDINATES: ${c.x}, ${c.y}</p>
+              <input type="text" id="city-input" placeholder="SETTLEMENT NAME" autocomplete="off"/>
+              <button id="city-submit" style="background:var(--red); color:white; border:none; padding:12px; width:100%; cursor:pointer; font-family:Oswald; font-weight:700; width:100%;">CONFIRM FOUNDATION</button>
+            `;
+            document.getElementById('city-submit').onclick = async () => {
+              const name = document.getElementById('city-input').value.trim();
+              if (!name) return;
+              try {
+                const r = await fetch(`${API}/web/city`, {
+                  method: 'POST', headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ name, x: c.x, y: c.y }), credentials: 'include'
+                });
+                if (r.ok) { 
+                  ui.cardContent.innerHTML = "<p style='color:var(--gold); font-family:Oswald;'>ESTABLISHED.</p>"; 
+                  state.user.has_city = true; setTimeout(() => ui.card.classList.remove('visible'), 2000); 
+                } else { const d = await r.json(); alert(d.detail); }
+              } catch(e) {}
+            };
+          }
+        }
+      }
+    });
+
+    document.querySelectorAll('.mode-btn').forEach(btn => {
+      btn.onclick = () => {
+        state.mode = btn.dataset.mode;
+        document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        if (state.mode === 'view') ui.card.classList.remove('visible');
+      };
+    });
+
+    document.getElementById('info-close').onclick = () => { ui.info.classList.remove('open'); document.querySelectorAll('path.selected').forEach(p => p.classList.remove('selected')); };
+    
+    document.querySelectorAll('.zoom-btn').forEach(btn => {
+      btn.onclick = () => {
+        const delta = btn.dataset.zoom === 'in' ? 1.5 : 1/1.5;
+        const oldZ = state.target.zoom;
+        state.target.zoom = Math.min(Math.max(state.target.zoom * delta, 0.4), 10);
+        const mx = window.innerWidth / 2; const my = window.innerHeight / 2;
+        state.target.panX = mx - (mx - state.target.panX) * (state.target.zoom / oldZ);
+        state.target.panY = my - (my - state.target.panY) * (state.target.zoom / oldZ);
+      };
+    });
+  }
+
+  function connectWS() {
+    const ws = new WebSocket(WS_URL);
+    ws.onmessage = e => {
+      const d = JSON.parse(e.data);
+      if (d.type === 'borders_update') { state.bordersSvg = d.svg; renderBorders(); fetchCities(); }
+    };
+    ws.onclose = () => setTimeout(connectWS, 3000);
+  }
+
   init();
 })();
 </script>
-
 </body>
 </html>

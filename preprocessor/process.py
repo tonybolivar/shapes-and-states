@@ -14,7 +14,7 @@ import numpy as np
 from PIL import Image
 
 ROOT = Path(__file__).parent.parent
-TERRAIN_MAP = ROOT / "terrain_map.png"
+TERRAIN_MAP = ROOT / "backend" / "static" / "terrain_map.png"
 CITIES_FILE = ROOT / "data" / "cities.json"
 BORDERS_SVG = ROOT / "data" / "borders.svg"
 

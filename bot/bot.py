@@ -140,7 +140,7 @@ async def my_city(interaction: discord.Interaction):
         return
 
     cities = body if isinstance(body, list) else []
-    city = next((c for c in cities if c.get("owner_id") == str(interaction.user.id)), None)
+    city = next((c for c in cities if c.get("owner") == str(interaction.user.id)), None)
 
     if not city:
         embed = discord.Embed(
