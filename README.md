@@ -119,58 +119,6 @@ The bot does not hold any map state itself. Every operation is a synchronous HTT
 
 ---
 
-## API Endpoints
-
-| Method | Path | Auth | Description |
-|--------|------|------|-------------|
-| GET | `/auth/discord` | -- | Redirects to Discord OAuth2 |
-| GET | `/auth/callback` | -- | OAuth2 callback, sets session cookie |
-| GET | `/auth/me` | Session | Returns current user + has_city flag |
-| GET | `/auth/logout` | Session | Clears session, redirects to frontend |
-| GET | `/cities` | -- | Returns all cities with player metadata joined |
-| POST | `/web/city` | Session cookie | Place a city from the web UI |
-| POST | `/bot/city` | X-Bot-Secret header | Place a city from the Discord bot |
-| WS | `/ws` | -- | WebSocket for live border updates |
-| GET | `/static/*` | -- | Static files (base_map.png, terrain_map.png) |
-| GET | `/data/*` | -- | Data files (borders.svg, cities.json) |
-
----
-
-## Deployment
-
-**Backend + Bot:** Railway. The `Procfile` runs both processes in the same dyno:
-```
-web: python bot/bot.py & python backend/server.py
-```
-The server binds to `$PORT` (Railway-injected). The bot process connects to Discord's gateway.
-
-**Frontend:** Vercel. `vercel.json` specifies the Astro framework. The frontend reads `PUBLIC_API_URL` and `PUBLIC_WS_URL` at build time from Vercel environment variables.
-
-**Session cookies:** `SameSite=None; Secure` is required because the frontend (Vercel) and backend (Railway) are on different origins. `SameSite=Lax` silently drops the session cookie on cross-origin redirects from the OAuth callback.
-
-**Database:** PostgreSQL on Railway in production. The backend detects the `DATABASE_URL` environment variable; if absent or not a postgres URI, it falls back to a local SQLite file (`sns.db`).
-
----
-
-## Environment Variables
-
-| Variable | Used By | Description |
-|----------|---------|-------------|
-| `DISCORD_CLIENT_ID` | Backend | OAuth2 app client ID |
-| `DISCORD_CLIENT_SECRET` | Backend | OAuth2 app client secret |
-| `DISCORD_REDIRECT_URI` | Backend | OAuth2 callback URL |
-| `BOT_TOKEN` | Bot | Discord bot token |
-| `BOT_SECRET` | Backend + Bot | Shared secret for bot API auth |
-| `DATABASE_URL` | Backend | PostgreSQL connection string |
-| `SECRET_KEY` | Backend | Session middleware signing key |
-| `WEB_URL` | Backend | Frontend origin (for CORS + redirects) |
-| `BACKEND_URL` | Bot | Backend base URL |
-| `DEBUG_MODE` | Backend | If true, bypasses one-city-per-player limit |
-| `PUBLIC_API_URL` | Frontend | Backend URL (injected at build time) |
-| `PUBLIC_WS_URL` | Frontend | WebSocket URL (injected at build time) |
-
----
-
 ## Tech Stack
 
 | Layer | Technology |
