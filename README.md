@@ -1,6 +1,6 @@
 # Shapes & States
 
-A terrain-weighted Voronoi political map simulator. Players claim territory by placing cities through a Discord bot. Territory borders are computed server-side using multi-source Dijkstra's algorithm over a terrain cost raster, then streamed live to all connected web clients as SVG via WebSocket.
+A terrain-weighted Voronoi political map simulator. Players claim territory by placing cities either through the web client or the Discord bot. Territory borders are computed server-side using multi-source Dijkstra's algorithm over a terrain cost raster, then streamed live to all connected web clients as SVG via WebSocket.
 
 ---
 
@@ -8,14 +8,15 @@ A terrain-weighted Voronoi political map simulator. Players claim territory by p
 
 Each player founds exactly one city on the map. The server computes which pixels of the map belong to each city by running a weighted shortest-path flood from all city origins simultaneously. The result is rendered as an SVG overlay on the base map. Every connected browser sees border updates in real time the moment a city is placed.
 
-The web frontend is read-only. City placement is exclusive to Discord slash commands.
+City placement has two entry points: the web client (Interact mode, requires Discord login) and the Discord bot slash commands. Both hit the same backend logic and trigger the same border recomputation.
 
 ---
 
 ## Architecture
 
 ```
-Discord Bot  -->  POST /bot/city  -->  FastAPI Backend  -->  cities.json
+Web Client   -->  POST /web/city  -->  FastAPI Backend  -->  cities.json
+Discord Bot  -->  POST /bot/city  --^        |
                                                |
                                      Dijkstra + skimage
                                                |
@@ -115,7 +116,7 @@ The bot does not hold any map state itself. Every operation is a synchronous HTT
 
 **Modes:**
 - View mode: clicking territories opens the settlement info panel.
-- Interact mode: clicking empty land opens a city placement form that POSTs to `/web/city`. Clicking a territory still opens the info panel.
+- Interact mode: clicking empty land opens a city placement form. The player names their city, confirms, and the client POSTs to `/web/city`. The server validates water placement and the one-city-per-player limit, writes to `cities.json`, recomputes borders, and broadcasts the update. Clicking a territory in interact mode still opens the info panel.
 
 ---
 
