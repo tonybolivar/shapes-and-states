@@ -76,6 +76,12 @@ const PUBLIC_WS_URL = import.meta.env.PUBLIC_WS_URL;
       text-decoration: none; cursor: pointer;
     }
 
+    .header-right {
+      display: flex; align-items: center; justify-content: flex-end; gap: 12px;
+      font-family: 'Oswald', sans-serif; font-size: 0.75rem; font-weight: 600;
+      text-transform: uppercase; letter-spacing: 0.1em; color: var(--white);
+    }
+
     /* ── MAP ───────────────────────────────────────── */
     .map-wrapper {
       position: fixed; top: var(--header-h); left: 0; right: 0; bottom: 0;
@@ -385,6 +391,16 @@ const PUBLIC_WS_URL = import.meta.env.PUBLIC_WS_URL;
       state.cities.forEach(c => {
         const m = document.createElement('div'); m.className = 'city-marker';
         m.style.left = `${(c.x / state.mapWidth) * 100}%`; m.style.top = `${(c.y / state.mapHeight) * 100}%`;
+        m.style.pointerEvents = 'auto'; m.style.cursor = 'pointer';
+        m.addEventListener('click', (e) => {
+          e.stopPropagation();
+          document.querySelectorAll('path.selected').forEach(p => p.classList.remove('selected'));
+          document.querySelectorAll(`.borders-layer path[id="${c.id}"]`).forEach(p => p.classList.add('selected'));
+          document.getElementById('info-city-name').textContent = c.name;
+          document.getElementById('info-owner-name').textContent = c.username || 'Citizen';
+          document.getElementById('info-coords').textContent = `${c.x}, ${c.y}`;
+          ui.info.classList.add('open'); ui.card.classList.remove('visible');
+        });
         layer.appendChild(m);
       });
     });
