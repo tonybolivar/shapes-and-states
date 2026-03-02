@@ -110,9 +110,15 @@ const PUBLIC_WS_URL = import.meta.env.PUBLIC_WS_URL;
       pointer-events: none;
     }
     .borders-layer { z-index: 10; }
-    .cities-layer { z-index: 15; }
+    .cities-layer { z-index: 5; }
 
     .borders-layer svg { width: 100%; height: 100%; display: block; pointer-events: none; }
+    .borders-layer circle.city-dot {
+      pointer-events: all; cursor: pointer;
+      fill: white; stroke: var(--red); stroke-width: 3;
+      transition: fill 0.2s, stroke 0.2s;
+    }
+    .borders-layer circle.city-dot:hover { fill: var(--gold); stroke: var(--gold); }
     .borders-layer path {
       pointer-events: all;
       cursor: pointer;
@@ -389,13 +395,16 @@ const PUBLIC_WS_URL = import.meta.env.PUBLIC_WS_URL;
 
   function renderCities() {
     if (!state.mapWidth || !state.isReady) return;
-    document.querySelectorAll('.cities-layer').forEach(layer => {
-      layer.innerHTML = '';
+    const NS = 'http://www.w3.org/2000/svg';
+    document.querySelectorAll('.borders-layer').forEach(layer => {
+      layer.querySelectorAll('circle.city-dot').forEach(el => el.remove());
+      const svg = layer.querySelector('svg');
+      if (!svg) return;
       state.cities.forEach(c => {
-        const m = document.createElement('div'); m.className = 'city-marker';
-        m.style.left = `${(c.x / state.mapWidth) * 100}%`; m.style.top = `${(c.y / state.mapHeight) * 100}%`;
-        m.style.pointerEvents = 'auto'; m.style.cursor = 'pointer';
-        m.addEventListener('click', (e) => {
+        const circle = document.createElementNS(NS, 'circle');
+        circle.setAttribute('cx', c.x); circle.setAttribute('cy', c.y); circle.setAttribute('r', 6);
+        circle.classList.add('city-dot');
+        circle.addEventListener('click', (e) => {
           e.stopPropagation();
           document.querySelectorAll('path.selected').forEach(p => p.classList.remove('selected'));
           document.querySelectorAll(`.borders-layer path[id="${c.id}"]`).forEach(p => p.classList.add('selected'));
@@ -404,7 +413,7 @@ const PUBLIC_WS_URL = import.meta.env.PUBLIC_WS_URL;
           document.getElementById('info-coords').textContent = `${c.x}, ${c.y}`;
           ui.info.classList.add('open'); ui.card.classList.remove('visible');
         });
-        layer.appendChild(m);
+        svg.appendChild(circle);
       });
     });
   }
