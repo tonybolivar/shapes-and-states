@@ -475,7 +475,11 @@ const PUBLIC_WS_URL = import.meta.env.PUBLIC_WS_URL;
           if (!state.user) {
             ui.cardContent.innerHTML = `<p style='color:var(--muted);'>LOGIN REQUIRED</p>`;
           } else if (state.user.has_city && !state.user.debug_mode) {
-            ui.cardContent.innerHTML = `<p style='color:var(--red);'>LIMIT REACHED</p>`;
+            const mine = state.cities.find(c => c.owner === state.user.discord_id);
+            ui.cardContent.innerHTML = `
+              <p style='color:var(--red); font-family:Oswald; font-size:1rem; letter-spacing:0.1em;'>CITY ALREADY FOUNDED</p>
+              ${mine ? `<p style='color:var(--gold); margin-top:10px; font-family:Oswald;'>${mine.name}</p><p style='color:var(--muted); font-size:0.75rem; margin-top:4px;'>${mine.x}, ${mine.y}</p>` : ''}
+            `;
           } else {
             ui.cardContent.innerHTML = `
               <h3 style='font-family:Oswald; color:var(--red); margin-bottom:12px;'>ESTABLISH SETTLEMENT</h3>
