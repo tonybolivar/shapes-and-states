@@ -384,7 +384,22 @@ const PUBLIC_WS_URL = import.meta.env.PUBLIC_WS_URL;
 
   function renderBorders() {
     if (!state.bordersSvg || !state.isReady) return;
-    document.querySelectorAll('.borders-layer').forEach(layer => { layer.innerHTML = state.bordersSvg; });
+    document.querySelectorAll('.borders-layer').forEach(layer => {
+      layer.innerHTML = state.bordersSvg;
+      layer.querySelectorAll('path').forEach(path => {
+        path.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const city = state.cities.find(c => c.id === path.id);
+          document.querySelectorAll('path.selected').forEach(p => p.classList.remove('selected'));
+          document.querySelectorAll(`.borders-layer path[id="${path.id}"]`).forEach(p => p.classList.add('selected'));
+          document.getElementById('info-city-name').textContent = city ? city.name : path.id;
+          document.getElementById('info-owner-name').textContent = city ? (city.username || 'Citizen') : 'Neutral Territory';
+          document.getElementById('info-coords').textContent = city ? `${city.x}, ${city.y}` : 'Unmapped';
+          ui.info.classList.add('open');
+          ui.card.classList.remove('visible');
+        });
+      });
+    });
   }
 
   function renderCities() {
@@ -452,19 +467,6 @@ const PUBLIC_WS_URL = import.meta.env.PUBLIC_WS_URL;
     }, { passive: false });
 
     ui.wrapper.addEventListener('click', (e) => {
-      const path = e.target.closest('path');
-      if (path) {
-        e.stopPropagation();
-        const city = state.cities.find(c => c.id === path.id);
-        document.querySelectorAll('path.selected').forEach(p => p.classList.remove('selected'));
-        document.querySelectorAll(`.borders-layer path[id="${path.id}"]`).forEach(p => p.classList.add('selected'));
-        document.getElementById('info-city-name').textContent = city ? city.name : path.id;
-        document.getElementById('info-owner-name').textContent = city ? (city.username || 'Citizen') : 'Neutral Territory';
-        document.getElementById('info-coords').textContent = city ? `${city.x}, ${city.y}` : 'Unmapped';
-        ui.info.classList.add('open'); ui.card.classList.remove('visible');
-        return;
-      }
-
       if (e.target.closest('.base-map-img')) {
         ui.info.classList.remove('open');
         document.querySelectorAll('path.selected').forEach(p => p.classList.remove('selected'));
