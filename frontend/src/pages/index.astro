@@ -353,7 +353,7 @@ const PUBLIC_WS_URL = import.meta.env.PUBLIC_WS_URL;
   async function loadBorders() {
     try {
       const r = await fetch(`${API}/data/borders.svg`);
-      if (r.ok) { state.bordersSvg = await r.text(); renderBorders(); }
+      if (r.ok) { state.bordersSvg = await r.text(); renderBorders(); renderCities(); }
     } catch(e) {}
   }
 
@@ -532,7 +532,7 @@ const PUBLIC_WS_URL = import.meta.env.PUBLIC_WS_URL;
     const ws = new WebSocket(WS_URL);
     ws.onmessage = e => {
       const d = JSON.parse(e.data);
-      if (d.type === 'borders_update') { state.bordersSvg = d.svg; renderBorders(); fetchCities(); }
+      if (d.type === 'borders_update') { state.bordersSvg = d.svg; renderBorders(); renderCities(); fetchCities(); }
     };
     ws.onclose = () => setTimeout(connectWS, 3000);
   }
