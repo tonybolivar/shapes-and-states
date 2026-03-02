@@ -232,7 +232,12 @@ app = FastAPI(title="Shapes & States API")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:4321", "http://127.0.0.1:4321", WEB_URL],
+    allow_origins=[
+        "http://localhost:4321",
+        "http://127.0.0.1:4321",
+        "https://shapes-and-states.vercel.app",
+        WEB_URL,
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
