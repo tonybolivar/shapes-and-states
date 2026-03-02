@@ -7,15 +7,12 @@ Integrated Voronoi Preprocessor for high performance.
 import asyncio
 import json
 import os
-import sys
 import uuid
 import sqlite3
-import traceback
 import hashlib
 import heapq
 from pathlib import Path
 from typing import Optional, List, Dict, Any
-from functools import partial
 
 import httpx
 import numpy as np
@@ -23,9 +20,9 @@ import psycopg2
 import psycopg2.extras
 from authlib.integrations.starlette_client import OAuth
 from dotenv import load_dotenv
-from fastapi import FastAPI, Header, HTTPException, WebSocket, WebSocketDisconnect, Request
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, RedirectResponse, Response
+from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from starlette.middleware.sessions import SessionMiddleware
@@ -85,7 +82,8 @@ class Database:
             return self.get_conn()
 
     def init_db(self):
-        with self.get_conn() as conn:
+        conn = self.get_conn()
+        try:
             cur = conn.cursor()
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS players (
@@ -96,10 +94,13 @@ class Database:
                 )
             """)
             conn.commit()
+        finally:
+            conn.close()
 
     def execute(self, query: str, params: tuple = (), fetch: bool = False):
         sql = query.replace("%s", "?") if self.is_sqlite else query
-        with self.get_conn() as conn:
+        conn = self.get_conn()
+        try:
             cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) if not self.is_sqlite and fetch else conn.cursor()
             cur.execute(sql, params)
             if fetch:
@@ -107,6 +108,8 @@ class Database:
                 return [dict(r) for r in rows]
             conn.commit()
             return None
+        finally:
+            conn.close()
 
 db = Database()
 
@@ -121,7 +124,6 @@ def write_cities(cities: List[Dict[str, Any]]):
 
 # ─── INTEGRATED PREPROCESSOR LOGIC ───────────────────────────────────────── #
 _cost_grid_cache: Optional[np.ndarray] = None
-_terrain_img_cache: Optional[Image.Image] = None
 
 def get_cost_grid() -> np.ndarray:
     global _cost_grid_cache
@@ -221,7 +223,7 @@ def generate_borders_svg(cities: List[Dict[str, Any]]) -> str:
 
 async def update_borders():
     cities = read_cities()
-    svg = await asyncio.get_event_loop().run_in_executor(None, generate_borders_svg, cities)
+    svg = await asyncio.get_running_loop().run_in_executor(None, generate_borders_svg, cities)
     BORDERS_SVG.write_text(svg, encoding="utf-8")
     return svg
 
