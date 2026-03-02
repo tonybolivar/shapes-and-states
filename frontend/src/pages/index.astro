@@ -396,7 +396,6 @@ const PUBLIC_WS_URL = import.meta.env.PUBLIC_WS_URL;
         m.style.left = `${(c.x / state.mapWidth) * 100}%`; m.style.top = `${(c.y / state.mapHeight) * 100}%`;
         m.style.pointerEvents = 'auto'; m.style.cursor = 'pointer';
         m.addEventListener('click', (e) => {
-          if (state.mode !== 'view') return;
           e.stopPropagation();
           document.querySelectorAll('path.selected').forEach(p => p.classList.remove('selected'));
           document.querySelectorAll(`.borders-layer path[id="${c.id}"]`).forEach(p => p.classList.add('selected'));
