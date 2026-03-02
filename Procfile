@@ -1,2 +1,1 @@
-web: python backend/server.py
-bot: python bot/bot.py
+web: python bot/bot.py & python backend/server.py
