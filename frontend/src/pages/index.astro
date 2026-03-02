@@ -58,15 +58,18 @@ const PUBLIC_WS_URL = import.meta.env.PUBLIC_WS_URL;
     .site-title { font-family: 'Oswald', sans-serif; font-size: 1.25rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; }
 
     .mode-selector {
-      display: flex; gap: 4px; background: var(--surface);
-      padding: 4px; border: 1px solid var(--dim); border-radius: 4px;
+      display: flex; gap: 0; border: 2px solid var(--dim);
+      clip-path: polygon(8px 0%, 100% 0%, calc(100% - 8px) 100%, 0% 100%);
     }
     .mode-btn {
-      padding: 6px 16px; font-size: 0.65rem; font-weight: 700;
-      text-transform: uppercase; color: var(--muted);
-      cursor: pointer; border: none; background: none; transition: all 0.2s;
+      padding: 6px 22px; font-size: 0.65rem; font-weight: 700; letter-spacing: 0.15em;
+      text-transform: uppercase; color: var(--muted); font-family: 'Oswald', sans-serif;
+      cursor: pointer; border: none; border-right: 1px solid var(--dim);
+      background: var(--surface); transition: color 0.2s, background 0.2s;
     }
-    .mode-btn.active { background: var(--red); color: white; }
+    .mode-btn:last-child { border-right: none; }
+    .mode-btn:hover:not(.active) { color: var(--white); background: var(--panel); }
+    .mode-btn.active { background: var(--red); color: var(--white); }
 
     .auth-button {
       display: inline-flex; align-items: center; padding: 6px 16px;
@@ -393,6 +396,7 @@ const PUBLIC_WS_URL = import.meta.env.PUBLIC_WS_URL;
         m.style.left = `${(c.x / state.mapWidth) * 100}%`; m.style.top = `${(c.y / state.mapHeight) * 100}%`;
         m.style.pointerEvents = 'auto'; m.style.cursor = 'pointer';
         m.addEventListener('click', (e) => {
+          if (state.mode !== 'view') return;
           e.stopPropagation();
           document.querySelectorAll('path.selected').forEach(p => p.classList.remove('selected'));
           document.querySelectorAll(`.borders-layer path[id="${c.id}"]`).forEach(p => p.classList.add('selected'));
