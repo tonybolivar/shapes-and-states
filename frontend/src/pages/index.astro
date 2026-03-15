@@ -278,6 +278,32 @@ const PUBLIC_WS_URL = import.meta.env.PUBLIC_WS_URL;
     }
     .coord-readout.visible { opacity: 1; }
     .hover-info { color: var(--gold); border-left: 1px solid var(--dim); padding-left: 16px; font-weight: 600; text-transform: uppercase; }
+
+    .map-tooltip {
+      position: fixed;
+      pointer-events: none;
+      z-index: 9999;
+      background: var(--panel);
+      border: 1px solid var(--red);
+      color: var(--white);
+      padding: 6px 10px;
+      font-family: 'Oswald', sans-serif;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 0.2s ease, visibility 0.2s;
+      white-space: nowrap;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.8);
+      line-height: 1.2;
+    }
+    .tooltip-owner { font-size: 0.6rem; color: var(--muted); display: block; margin-bottom: 2px; }
+    .tooltip-province { font-size: 0.8rem; color: var(--gold); display: block; font-weight: 600; }
+    
+    .map-tooltip.visible {
+      opacity: 1;
+      visibility: visible;
+    }
   </style>
 </head>
 <body>
@@ -326,8 +352,9 @@ const PUBLIC_WS_URL = import.meta.env.PUBLIC_WS_URL;
 
 <div class="coord-readout" id="coord-display">
   <div>GRID: <span id="coord-x">—</span>, <span id="coord-y">—</span></div>
-  <div class="hover-info" id="hover-info" style="display:none;">OWNER: <span id="hover-owner">—</span></div>
 </div>
+
+<div id="map-tooltip" class="map-tooltip"></div>
 
 <aside class="info-panel" id="info-panel">
   <div class="panel-content">
@@ -384,8 +411,7 @@ const PUBLIC_WS_URL = import.meta.env.PUBLIC_WS_URL;
     cardContent: document.getElementById('ui-card-content'),
     info: document.getElementById('info-panel'),
     coords: document.getElementById('coord-display'),
-    hoverInfo: document.getElementById('hover-info'),
-    hoverOwner: document.getElementById('hover-owner')
+    tooltip: document.getElementById('map-tooltip')
   };
 
   async function init() {
@@ -579,13 +605,24 @@ const PUBLIC_WS_URL = import.meta.env.PUBLIC_WS_URL;
       state.mouse.x = cx; state.mouse.y = cy;
       const c = getCoords(e);
       const path = document.elementFromPoint(cx, cy)?.closest('path');
+      
       if (path) {
         const city = state.cities.find(city => city.id === path.id);
-        ui.hoverOwner.textContent = city ? (city.username || 'Citizen') : 'Neutral';
-        ui.hoverInfo.style.display = 'block';
+        const ownerName = city ? (city.username || 'Citizen') : 'Neutral';
+        const provinceName = city ? city.name : 'Wilderness';
+        
+        ui.tooltip.innerHTML = `
+          <span class="tooltip-owner">${ownerName}</span>
+          <span class="tooltip-province">${provinceName}</span>
+        `;
+        
+        ui.tooltip.classList.add('visible');
+        ui.tooltip.style.left = (cx + 15) + 'px';
+        ui.tooltip.style.top = (cy + 15) + 'px';
       } else {
-        ui.hoverInfo.style.display = 'none';
+        ui.tooltip.classList.remove('visible');
       }
+
       if (c) {
         document.getElementById('coord-x').textContent = c.x;
         document.getElementById('coord-y').textContent = c.y;
