@@ -371,7 +371,6 @@ const PUBLIC_WS_URL = import.meta.env.PUBLIC_WS_URL;
     drag: { active: false, x: 0, y: 0, moved: false },
     isReady: false, mapWidth: 0, mapHeight: 0,
     isTouch: window.matchMedia("(pointer: coarse)").matches,
-    overUI: false,
     isOutside: false
   };
 
@@ -457,11 +456,11 @@ const PUBLIC_WS_URL = import.meta.env.PUBLIC_WS_URL;
       const lerp = 0.15; 
       
       // Edge-scrolling only for non-touch desktop and when NOT dragging
-      if (!state.isTouch && !state.drag.active && !state.isOutside && !state.overUI) {
+      if (!state.isTouch && !state.drag.active && !state.isOutside) {
         const margin = 15; const speed = 8;
         if (state.mouse.x < margin) state.target.panX += speed;
         else if (state.mouse.x > window.innerWidth - margin) state.target.panX -= speed;
-        if (state.mouse.y < margin + 64) state.target.panY += speed;
+        if (state.mouse.y < margin) state.target.panY += speed;
         else if (state.mouse.y > window.innerHeight - margin) state.target.panY -= speed;
       }
 
@@ -567,10 +566,6 @@ const PUBLIC_WS_URL = import.meta.env.PUBLIC_WS_URL;
       const cx = e.touches ? e.touches[0].clientX : e.clientX;
       const cy = e.touches ? e.touches[0].clientY : e.clientY;
 
-      // Detect if hovering over UI elements
-      const target = e.touches ? document.elementFromPoint(cx, cy) : e.target;
-      state.overUI = !!target?.closest('.site-header, .info-panel, .interaction-card, .zoom-controls, .mobile-menu, .coord-readout');
-      
       if (state.drag.active) {
         const dx = cx - state.drag.x;
         const dy = cy - state.drag.y;
