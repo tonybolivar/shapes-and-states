@@ -370,7 +370,8 @@ const PUBLIC_WS_URL = import.meta.env.PUBLIC_WS_URL;
     mouse: { x: window.innerWidth/2, y: window.innerHeight/2 },
     drag: { active: false, x: 0, y: 0, moved: false },
     isReady: false, mapWidth: 0, mapHeight: 0,
-    isTouch: window.matchMedia("(pointer: coarse)").matches
+    isTouch: window.matchMedia("(pointer: coarse)").matches,
+    overUI: false
   };
 
   const ui = {
@@ -564,6 +565,10 @@ const PUBLIC_WS_URL = import.meta.env.PUBLIC_WS_URL;
     const onMove = (e) => {
       const cx = e.touches ? e.touches[0].clientX : e.clientX;
       const cy = e.touches ? e.touches[0].clientY : e.clientY;
+
+      // Detect if hovering over UI elements
+      const target = e.touches ? document.elementFromPoint(cx, cy) : e.target;
+      state.overUI = !!target?.closest('.site-header, .info-panel, .interaction-card, .zoom-controls, .mobile-menu, .coord-readout');
       
       if (state.drag.active) {
         const dx = cx - state.drag.x;
